@@ -271,6 +271,8 @@ void NDTScanMatcher::timer_diagnostic()
 void NDTScanMatcher::callback_initial_pose(
   const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr initial_pose_msg_ptr)
 {
+  RCLCPP_INFO(get_logger(), "initial pose received");
+
   if (!is_activated_) return;
 
   // lock mutex for initial pose
@@ -311,6 +313,7 @@ void NDTScanMatcher::callback_regularization_pose(
 void NDTScanMatcher::callback_sensor_points(
   sensor_msgs::msg::PointCloud2::ConstSharedPtr sensor_points_sensorTF_msg_ptr)
 {
+  RCLCPP_INFO(get_logger(), "points received, time is: %d", sensor_points_sensorTF_msg_ptr->header.stamp.sec);
   // mutex ndt_ptr_
   std::lock_guard<std::mutex> lock(ndt_ptr_mtx_);
 
@@ -325,6 +328,12 @@ void NDTScanMatcher::callback_sensor_points(
   const std::string & sensor_frame = sensor_points_sensorTF_msg_ptr->header.frame_id;
 
   pcl::fromROSMsg(*sensor_points_sensorTF_msg_ptr, *sensor_points_sensorTF_ptr);
+  // Remove NaNs as this was causing failure
+  if (!sensor_points_sensorTF_ptr->is_dense) {
+		std::vector<int> indices;
+		pcl::removeNaNFromPointCloud(*sensor_points_sensorTF_ptr, *sensor_points_sensorTF_ptr, indices);
+		sensor_points_sensorTF_ptr->is_dense = false;
+	}
   transform_sensor_measurement(
     sensor_frame, base_frame_, sensor_points_sensorTF_ptr, sensor_points_baselinkTF_ptr);
   ndt_ptr_->setInputSource(sensor_points_baselinkTF_ptr);

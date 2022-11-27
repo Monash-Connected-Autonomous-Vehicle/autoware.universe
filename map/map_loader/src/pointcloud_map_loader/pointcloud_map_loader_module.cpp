@@ -53,12 +53,13 @@ sensor_msgs::msg::PointCloud2 PointcloudMapLoaderModule::loadPCDFiles(
     if (i % 50 == 0) {
       RCLCPP_INFO_STREAM(
         logger_,
-        fmt::format("Load {} ({} out of {})", path, i + 1, static_cast<int>(pcd_paths.size())));
+        fmt::format("Load (test) {} ({} out of {})", path, i + 1, static_cast<int>(pcd_paths.size())));
     }
 
     if (pcl::io::loadPCDFile(path, partial_pcd) == -1) {
       RCLCPP_ERROR_STREAM(logger_, "PCD load failed: " << path);
     }
+    RCLCPP_INFO_STREAM(logger_, "PCD load successful");
 
     if (whole_pcd.width == 0) {
       whole_pcd = partial_pcd;
