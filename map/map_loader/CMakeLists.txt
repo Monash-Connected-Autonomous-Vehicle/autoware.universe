@@ -22,34 +22,25 @@ rclcpp_components_register_node(pointcloud_map_loader_node
   EXECUTABLE pointcloud_map_loader
 )
 
-ament_auto_add_library(lanelet2_map_loader_node SHARED
-  src/lanelet2_map_loader/lanelet2_map_loader_node.cpp
-)
+# ament_auto_add_library(lanelet2_map_loader_node SHARED
+#   src/lanelet2_map_loader/lanelet2_map_loader_node.cpp
+# )
 
-rclcpp_components_register_node(lanelet2_map_loader_node
-  PLUGIN "Lanelet2MapLoaderNode"
-  EXECUTABLE lanelet2_map_loader
-)
+# rclcpp_components_register_node(lanelet2_map_loader_node
+#   PLUGIN "Lanelet2MapLoaderNode"
+#   EXECUTABLE lanelet2_map_loader
+# )
 
-ament_auto_add_library(lanelet2_map_visualization_node SHARED
-  src/lanelet2_map_loader/lanelet2_map_visualization_node.cpp
-)
+# ament_auto_add_library(lanelet2_map_visualization_node SHARED
+#   src/lanelet2_map_loader/lanelet2_map_visualization_node.cpp
+# )
 
-rclcpp_components_register_node(lanelet2_map_visualization_node
-  PLUGIN "Lanelet2MapVisualizationNode"
-  EXECUTABLE lanelet2_map_visualization
-)
+# rclcpp_components_register_node(lanelet2_map_visualization_node
+#   PLUGIN "Lanelet2MapVisualizationNode"
+#   EXECUTABLE lanelet2_map_visualization
+# )
 
-if(BUILD_TESTING)
-  add_ros_test(
-    test/lanelet2_map_loader_launch.test.py
-    TIMEOUT "30"
-  )
-  install(DIRECTORY
-    test/data/
-    DESTINATION share/${PROJECT_NAME}/test/data/
-  )
-endif()
+
 
 install(PROGRAMS
   script/map_hash_generator

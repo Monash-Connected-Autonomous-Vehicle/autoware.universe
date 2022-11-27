@@ -58,11 +58,11 @@ ament_auto_add_library(pointcloud_preprocessor_filter SHARED
   src/passthrough_filter/passthrough_filter_uint16_nodelet.cpp
   src/passthrough_filter/passthrough_uint16.cpp
   src/pointcloud_accumulator/pointcloud_accumulator_nodelet.cpp
-  src/vector_map_filter/lanelet2_map_filter_nodelet.cpp
+  # src/vector_map_filter/lanelet2_map_filter_nodelet.cpp
   src/distortion_corrector/distortion_corrector.cpp
   src/blockage_diag/blockage_diag_nodelet.cpp
   src/polygon_remover/polygon_remover.cpp
-  src/vector_map_filter/vector_map_inside_area_filter.cpp
+  # src/vector_map_filter/vector_map_inside_area_filter.cpp
 )
 
 target_link_libraries(pointcloud_preprocessor_filter
