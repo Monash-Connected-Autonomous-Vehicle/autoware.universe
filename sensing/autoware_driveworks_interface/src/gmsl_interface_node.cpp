@@ -1,19 +1,12 @@
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include <cstdio>
-
-int main(int argc, char ** argv)
-{
-  (void) argc;
-  (void) argv;
-
-  printf("hello world autoware_driveworks_interface package\n");
-  return 0;
-}
-
-/*
-
-// ROS Includes
-#include <ros/ros.h>
 #include <signal.h>
+
+#include "rclcpp/rclcpp.hpp"
 #include "gmsl_interface.hpp"
 
 gmsl_camera::GMSLCameraNode *gmsl_ptr;
@@ -24,9 +17,11 @@ void sig_int_handler(int sig)
   gmsl_ptr->g_runSetter(false);
 }
 
-int main(int argc, char **argv)
+
+int main(int argc, char ** argv)
 {
-  ros::init(argc, argv, "gmsl_camera_interface");
+  rclcpp::init(argc, argv);
+  auto node = rclcpp::Node::make_shared("gmsl_camera_interface");
   gmsl_camera::GMSLCameraNode gmsl;
   gmsl_ptr = &gmsl;  
   
@@ -44,6 +39,17 @@ int main(int argc, char **argv)
 
   gmsl.run();
   return 0;
+}
+
+/*
+
+
+
+
+int main(int argc, char **argv)
+{
+ 
+  
 }
 
 */
