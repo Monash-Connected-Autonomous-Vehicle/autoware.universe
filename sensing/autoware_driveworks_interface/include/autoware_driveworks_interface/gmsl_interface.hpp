@@ -22,8 +22,8 @@ public:
 
 private:
   // handle
-  ros::NodeHandle nh_; // ?
-  ros::NodeHandle private_nh_; // ?
+  //ros::NodeHandle nh_; // ?
+  //ros::NodeHandle private_nh_; // ?
 
   bool gTakeScreenshot = false;
   int gScreenshotCount = 0;
