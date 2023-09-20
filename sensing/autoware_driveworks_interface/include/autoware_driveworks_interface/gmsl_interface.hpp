@@ -1,20 +1,44 @@
-#include <cstdio>
+#ifndef GMSL_CAMERA_CORE_H
+#define GMSL_CAMERA_CORE_H
 
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+// ROS includes
+#include "rclcpp/rclcpp.hpp" 
+#include "sensor_msgs/msg/image.hpp"
+#include "std_msgs/msg/string.hpp"  
 #include "std_msgs/msg/int32.hpp"
 
-
-int main(int argc, char ** argv)
+namespace gmsl_camera
 {
-  (void) argc;
-  (void) argv;
+class GMSLCameraNode
+{
+public:
+  GMSLCameraNode();
+  ~GMSLCameraNode();
 
-  printf("hello world autoware_driveworks_interface package\n");
-  return 0;
+  void run();
+  void g_runSetter(bool);
+  int argc_;
+  char **argv_;
+
+private:
+  // handle
+  ros::NodeHandle nh_; // ?
+  ros::NodeHandle private_nh_; // ?
+
+  bool gTakeScreenshot = false;
+  int gScreenshotCount = 0;
+  uint32_t imageWidth;
+  uint32_t imageHeight;
+
+  // initializer
+  void initForROS();
+  void initForDW();
+};
 }
+#endif
 
 
+// Autoware ai: 
 /*
 
 #ifndef GMSL_CAMERA_CORE_H

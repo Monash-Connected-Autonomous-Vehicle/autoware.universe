@@ -17,7 +17,7 @@ find_package(sensor_msgs REQUIRED)
 add_executable(talker src/publisher_member_function.cpp)
 ament_target_dependencies(talker rclcpp std_msgs)
 
-add_executable(gmsl_interface src/gmsl_interface.cpp)
+add_executable(gmsl_interface src/gmsl_interface_node.cpp)
 ament_target_dependencies(gmsl_interface rclcpp std_msgs sensor_msgs)
 
 target_include_directories(gmsl_interface PUBLIC
@@ -28,11 +28,11 @@ target_compile_features(gmsl_interface PUBLIC c_std_99 cxx_std_17)  # Require C9
 add_executable(listener src/subscriber_member_function.cpp)
 ament_target_dependencies(listener rclcpp std_msgs)
   
-  install(TARGETS
-    talker
-    listener
-    gmsl_interface
-    DESTINATION lib/${PROJECT_NAME})
+install(TARGETS
+  talker
+  listener
+  gmsl_interface
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
