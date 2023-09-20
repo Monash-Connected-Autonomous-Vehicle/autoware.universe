@@ -8,6 +8,9 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
@@ -16,3 +19,31 @@
     <build_type>ament_cmake</build_type>
   </export>
 </package>
+
+
+
+
+<!-- Autoware ai -->
+<!-- 
+
+<?xml version="1.0"?>
+<package format="2">
+  <name>autoware_driveworks_interface</name>
+  <version>1.12.0</version>
+  <description>The autoware_driveworks packages</description>
+  <maintainer email="yusuke.fujii@tier4.jp">Yusuke FUJII</maintainer>
+  <author email="yusuke.fujii@tier4.jp">Yusuke FUJII</author>
+  <author email="abrahammonrroy@yahoo.com">amc</author>
+  <license>Apache 2</license>
+
+  <buildtool_depend>autoware_build_flags</buildtool_depend>
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <depend>autoware_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+</package>
+  
+ -->
