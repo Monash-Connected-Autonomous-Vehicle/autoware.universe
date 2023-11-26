@@ -75,8 +75,10 @@ struct ExtendedPredictedObject
   geometry_msgs::msg::TwistWithCovariance initial_twist;
   geometry_msgs::msg::AccelWithCovariance initial_acceleration;
   autoware_auto_perception_msgs::msg::Shape shape;
+  std::vector<autoware_auto_perception_msgs::msg::ObjectClassification> classification;
   std::vector<PredictedPathWithPolygon> predicted_paths;
 };
+using ExtendedPredictedObjects = std::vector<ExtendedPredictedObject>;
 
 /**
  * @brief Specifies which object class should be checked.
@@ -171,6 +173,7 @@ struct ObjectsFilteringParams
 struct SafetyCheckParams
 {
   bool enable_safety_check{false};  ///< Enable safety checks.
+  double keep_unsafe_time{0.0};     ///< Time to keep unsafe before changing to safe.
   double hysteresis_factor_expand_rate{
     0.0};                            ///< Hysteresis factor to expand/shrink polygon with the value.
   double backward_path_length{0.0};  ///< Length of the backward lane for path generation.
@@ -181,22 +184,24 @@ struct SafetyCheckParams
 
 struct CollisionCheckDebug
 {
-  std::string unsafe_reason;                ///< Reason indicating unsafe situation.
-  Twist current_twist{};                    ///< Ego vehicle's current velocity and rotation.
-  Pose expected_ego_pose{};                 ///< Predicted future pose of ego vehicle.
-  Pose current_obj_pose{};                  ///< Detected object's current pose.
-  Twist object_twist{};                     ///< Detected object's velocity and rotation.
-  Pose expected_obj_pose{};                 ///< Predicted future pose of object.
-  double rss_longitudinal{0.0};             ///< Longitudinal RSS measure.
-  double inter_vehicle_distance{0.0};       ///< Distance between ego vehicle and object.
-  double extended_polygon_lon_offset{0.0};  ///< Longitudinal offset for extended polygon.
-  double extended_polygon_lat_offset{0.0};  ///< Lateral offset for extended polygon.
-  bool is_front{false};                     ///< True if object is in front of ego vehicle.
-  bool is_safe{false};                      ///< True if situation is deemed safe.
+  std::string unsafe_reason;           ///< Reason indicating unsafe situation.
+  Twist current_twist{};               ///< Ego vehicle's current velocity and rotation.
+  Pose expected_ego_pose{};            ///< Predicted future pose of ego vehicle.
+  Pose current_obj_pose{};             ///< Detected object's current pose.
+  Twist object_twist{};                ///< Detected object's velocity and rotation.
+  Pose expected_obj_pose{};            ///< Predicted future pose of object.
+  double rss_longitudinal{0.0};        ///< Longitudinal RSS measure.
+  double inter_vehicle_distance{0.0};  ///< Distance between ego vehicle and object.
+  double forward_lon_offset{0.0};      ///< Forward longitudinal offset for extended polygon.
+  double backward_lon_offset{0.0};     ///< Backward longitudinal offset for extended polygon.
+  double lat_offset{0.0};              ///< Lateral offset for extended polygon.
+  bool is_front{false};                ///< True if object is in front of ego vehicle.
+  bool is_safe{false};                 ///< True if situation is deemed safe.
   std::vector<PoseWithVelocityStamped> ego_predicted_path;  ///< ego vehicle's predicted path.
   std::vector<PoseWithVelocityAndPolygonStamped> obj_predicted_path;  ///< object's predicted path.
   Polygon2d extended_ego_polygon{};  ///< Ego vehicle's extended collision polygon.
   Polygon2d extended_obj_polygon{};  ///< Detected object's extended collision polygon.
+  autoware_auto_perception_msgs::msg::Shape obj_shape;  ///< object's shape.
 };
 using CollisionCheckDebugPair = std::pair<std::string, CollisionCheckDebug>;
 using CollisionCheckDebugMap =
