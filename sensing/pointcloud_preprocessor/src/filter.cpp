@@ -77,7 +77,7 @@ pointcloud_preprocessor::Filter::Filter(
     latched_indices_ = static_cast<bool>(declare_parameter("latched_indices", false));
     approximate_sync_ = static_cast<bool>(declare_parameter("approximate_sync", false));
 
-    RCLCPP_INFO_STREAM(
+    RCLCPP_DEBUG_STREAM(
       this->get_logger(),
       "Filter (as Component) successfully created with the following parameters:"
         << std::endl
@@ -89,8 +89,10 @@ pointcloud_preprocessor::Filter::Filter(
 
   // Set publisher
   {
+    rclcpp::PublisherOptions pub_options;
+    pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
     pub_output_ = this->create_publisher<PointCloud2>(
-      "output", rclcpp::SensorDataQoS().keep_last(max_queue_size_));
+      "output", rclcpp::SensorDataQoS().keep_last(max_queue_size_), pub_options);
   }
 
   subscribe(filter_name);
@@ -102,6 +104,8 @@ pointcloud_preprocessor::Filter::Filter(
   set_param_res_filter_ = this->add_on_set_parameters_callback(
     std::bind(&Filter::filterParamCallback, this, std::placeholders::_1));
 
+  published_time_publisher_ =
+    std::make_unique<autoware::universe_utils::PublishedTimePublisher>(this);
   RCLCPP_DEBUG(this->get_logger(), "[Filter Constructor] successfully created.");
 }
 
@@ -125,7 +129,7 @@ void pointcloud_preprocessor::Filter::subscribe(const std::string & filter_name)
   // each time a child class supports the faster version.
   // When all the child classes support the faster version, this workaround is deleted.
   std::set<std::string> supported_nodes = {
-    "CropBoxFilter", "RingOutlierFilter", "VoxelGridDownsampleFilter"};
+    "CropBoxFilter", "RingOutlierFilter", "VoxelGridDownsampleFilter", "ScanGroundFilter"};
   auto callback = supported_nodes.find(filter_name) != supported_nodes.end()
                     ? &Filter::faster_input_indices_callback
                     : &Filter::input_indices_callback;
@@ -192,6 +196,7 @@ void pointcloud_preprocessor::Filter::computePublish(
 
   // Publish a boost shared ptr
   pub_output_->publish(std::move(output));
+  published_time_publisher_->publish_if_subscribed(pub_output_, input->header.stamp);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -456,6 +461,7 @@ void pointcloud_preprocessor::Filter::faster_input_indices_callback(
 
   output->header.stamp = cloud->header.stamp;
   pub_output_->publish(std::move(output));
+  published_time_publisher_->publish_if_subscribed(pub_output_, cloud->header.stamp);
 }
 
 // TODO(sykwer): Temporary Implementation: Remove this interface when all the filter nodes conform

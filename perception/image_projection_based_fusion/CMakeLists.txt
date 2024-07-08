@@ -22,6 +22,7 @@ ament_auto_add_library(${PROJECT_NAME} SHARED
   src/utils/utils.cpp
   src/roi_cluster_fusion/node.cpp
   src/roi_detected_object_fusion/node.cpp
+  src/segmentation_pointcloud_fusion/node.cpp
   src/roi_pointcloud_fusion/node.cpp
 )
 
@@ -38,6 +39,11 @@ rclcpp_components_register_node(${PROJECT_NAME}
 rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "image_projection_based_fusion::RoiClusterFusionNode"
   EXECUTABLE roi_cluster_fusion_node
+)
+
+rclcpp_components_register_node(${PROJECT_NAME}
+  PLUGIN "image_projection_based_fusion::SegmentPointCloudFusionNode"
+  EXECUTABLE segmentation_pointcloud_fusion_node
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}
@@ -121,6 +127,7 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
 
   ament_auto_add_library(pointpainting_lib SHARED
     src/pointpainting_fusion/node.cpp
+    src/pointpainting_fusion/pointcloud_densification.cpp
     src/pointpainting_fusion/pointpainting_trt.cpp
     src/pointpainting_fusion/voxel_generator.cpp
   )
@@ -152,6 +159,26 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
   )
 else()
   message("Skipping build of some nodes due to missing dependencies")
+endif()
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_auto_add_gtest(test_calc_iou_functions
+    test/test_calc_iou_functions.cpp
+  )
+  ament_auto_add_gtest(test_utils
+    test/test_utils.cpp
+  )
+  ament_auto_add_gtest(test_geometry
+    test/test_geometry.cpp
+  )
+  # test needed cuda, tensorRT and cudnn
+  if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
+    ament_auto_add_gtest(test_pointpainting
+      test/test_pointpainting_fusion.cpp
+    )
+  endif()
+
 endif()
 
 ament_auto_package(INSTALL_TO_SHARE

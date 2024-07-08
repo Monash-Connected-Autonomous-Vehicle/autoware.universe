@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <lanelet2_extension/utility/message_conversion.hpp>
+#include <autoware_lanelet2_extension/utility/message_conversion.hpp>
+#include <autoware_lanelet2_extension/utility/query.hpp>
 #include <rclcpp/time.hpp>
 #include <traffic_light_arbiter/traffic_light_arbiter.hpp>
 
@@ -40,6 +41,25 @@ std::vector<TrafficLightConstPtr> filter_traffic_signals(const LaneletMapConstPt
       signals.push_back(signal);
     }
   }
+
+  return signals;
+}
+
+std::vector<TrafficLightConstPtr> filter_pedestrian_signals(const LaneletMapConstPtr map)
+{
+  namespace query = lanelet::utils::query;
+
+  const auto all_lanelets = query::laneletLayer(map);
+  const auto crosswalks = query::crosswalkLanelets(all_lanelets);
+  std::vector<TrafficLightConstPtr> signals;
+
+  for (const auto & crosswalk : crosswalks) {
+    const auto traffic_light_reg_elems =
+      crosswalk.regulatoryElementsAs<const lanelet::TrafficLight>();
+    std::copy(
+      traffic_light_reg_elems.begin(), traffic_light_reg_elems.end(), std::back_inserter(signals));
+  }
+
   return signals;
 }
 
@@ -51,6 +71,12 @@ TrafficLightArbiter::TrafficLightArbiter(const rclcpp::NodeOptions & options)
   external_time_tolerance_ = this->declare_parameter<double>("external_time_tolerance", 5.0);
   perception_time_tolerance_ = this->declare_parameter<double>("perception_time_tolerance", 1.0);
   external_priority_ = this->declare_parameter<bool>("external_priority", false);
+  enable_signal_matching_ = this->declare_parameter<bool>("enable_signal_matching", false);
+
+  if (enable_signal_matching_) {
+    signal_match_validator_ = std::make_unique<SignalMatchValidator>();
+    signal_match_validator_->setExternalPriority(external_priority_);
+  }
 
   map_sub_ = create_subscription<LaneletMapBin>(
     "~/sub/vector_map", rclcpp::QoS(1).transient_local(),
@@ -78,6 +104,12 @@ void TrafficLightArbiter::onMap(const LaneletMapBin::ConstSharedPtr msg)
   for (const auto & signal : signals) {
     map_regulatory_elements_set_->emplace(signal->id());
   }
+
+  if (enable_signal_matching_) {
+    // Filter only pedestrian signals to distinguish them in signal matching
+    const auto pedestrian_signals = lanelet::filter_pedestrian_signals(map);
+    signal_match_validator_->setPedestrianSignals(pedestrian_signals);
+  }
 }
 
 void TrafficLightArbiter::onPerceptionMsg(const TrafficSignalArray::ConstSharedPtr msg)
@@ -87,7 +119,7 @@ void TrafficLightArbiter::onPerceptionMsg(const TrafficSignalArray::ConstSharedP
   if (
     (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_external_msg_.stamp)).seconds() >
     external_time_tolerance_) {
-    latest_external_msg_.signals.clear();
+    latest_external_msg_.traffic_light_groups.clear();
   }
 
   arbitrateAndPublish(msg->stamp);
@@ -100,7 +132,7 @@ void TrafficLightArbiter::onExternalMsg(const TrafficSignalArray::ConstSharedPtr
   if (
     (rclcpp::Time(msg->stamp) - rclcpp::Time(latest_perception_msg_.stamp)).seconds() >
     perception_time_tolerance_) {
-    latest_perception_msg_.signals.clear();
+    latest_perception_msg_.traffic_light_groups.clear();
   }
 
   arbitrateAndPublish(msg->stamp);
@@ -126,7 +158,7 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
   }
 
   auto add_signal_function = [&](const auto & signal, bool priority) {
-    const auto id = signal.traffic_signal_id;
+    const auto id = signal.traffic_light_group_id;
     if (!map_regulatory_elements_set_->count(id)) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 5000,
@@ -140,12 +172,20 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
     }
   };
 
-  for (const auto & signal : latest_perception_msg_.signals) {
-    add_signal_function(signal, false);
-  }
+  if (enable_signal_matching_) {
+    const auto validated_signals =
+      signal_match_validator_->validateSignals(latest_perception_msg_, latest_external_msg_);
+    for (const auto & signal : validated_signals.traffic_light_groups) {
+      add_signal_function(signal, false);
+    }
+  } else {
+    for (const auto & signal : latest_perception_msg_.traffic_light_groups) {
+      add_signal_function(signal, false);
+    }
 
-  for (const auto & signal : latest_external_msg_.signals) {
-    add_signal_function(signal, external_priority_);
+    for (const auto & signal : latest_external_msg_.traffic_light_groups) {
+      add_signal_function(signal, external_priority_);
+    }
   }
 
   const auto get_highest_confidence_elements =
@@ -177,13 +217,13 @@ void TrafficLightArbiter::arbitrateAndPublish(const builtin_interfaces::msg::Tim
       return highest_score_elements_vector;
     };
 
-  output_signals_msg.signals.reserve(regulatory_element_signals_map.size());
+  output_signals_msg.traffic_light_groups.reserve(regulatory_element_signals_map.size());
 
   for (const auto & [regulatory_element_id, elements] : regulatory_element_signals_map) {
     TrafficSignal signal_msg;
-    signal_msg.traffic_signal_id = regulatory_element_id;
+    signal_msg.traffic_light_group_id = regulatory_element_id;
     signal_msg.elements = get_highest_confidence_elements(elements);
-    output_signals_msg.signals.emplace_back(signal_msg);
+    output_signals_msg.traffic_light_groups.emplace_back(signal_msg);
   }
 
   pub_->publish(output_signals_msg);

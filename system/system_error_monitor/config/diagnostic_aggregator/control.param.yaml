@@ -6,7 +6,7 @@
       analyzers:
         autonomous_emergency_braking:
           type: diagnostic_aggregator/AnalyzerGroup
-          path: autonomous_emergency_braking
+          path: autoware_autonomous_emergency_braking
           analyzers:
             performance_monitoring:
               type: diagnostic_aggregator/AnalyzerGroup
@@ -66,6 +66,12 @@
                   type: diagnostic_aggregator/GenericAnalyzer
                   path: control_state
                   contains: [": control_state"]
+                  timeout: 1.0
+
+                control_validator:
+                  type: diagnostic_aggregator/GenericAnalyzer
+                  path: autoware_control_validator
+                  contains: [": control_validation_max_distance_deviation"]
                   timeout: 1.0
 
         external_control:

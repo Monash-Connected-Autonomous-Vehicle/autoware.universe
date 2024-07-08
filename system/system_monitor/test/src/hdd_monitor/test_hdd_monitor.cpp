@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "system_monitor/hdd_monitor/hdd_monitor.hpp"
+#include "system_monitor/hdd_reader/hdd_reader.hpp"
 
-#include <hdd_reader/hdd_reader.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -206,6 +206,7 @@ void * hdd_reader(void * args)
   addr.sin_family = AF_INET;
   addr.sin_port = htons(7635);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // cppcheck-suppress cstyleCast
   ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (ret < 0) {
     close(sock);

@@ -16,9 +16,10 @@
 #define TRAFFIC_LIGHT_ARBITER__TRAFFIC_LIGHT_ARBITER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
+#include <traffic_light_arbiter/signal_match_validator.hpp>
 
-#include <autoware_auto_mapping_msgs/msg/had_map_bin.hpp>
-#include <autoware_perception_msgs/msg/traffic_signal_array.hpp>
+#include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
+#include <autoware_perception_msgs/msg/traffic_light_group_array.hpp>
 
 #include <lanelet2_core/Forward.h>
 
@@ -31,10 +32,10 @@ public:
   explicit TrafficLightArbiter(const rclcpp::NodeOptions & options);
 
 private:
-  using Element = autoware_perception_msgs::msg::TrafficSignalElement;
-  using LaneletMapBin = autoware_auto_mapping_msgs::msg::HADMapBin;
-  using TrafficSignalArray = autoware_perception_msgs::msg::TrafficSignalArray;
-  using TrafficSignal = autoware_perception_msgs::msg::TrafficSignal;
+  using Element = autoware_perception_msgs::msg::TrafficLightElement;
+  using LaneletMapBin = autoware_map_msgs::msg::LaneletMapBin;
+  using TrafficSignalArray = autoware_perception_msgs::msg::TrafficLightGroupArray;
+  using TrafficSignal = autoware_perception_msgs::msg::TrafficLightGroup;
 
   rclcpp::Subscription<LaneletMapBin>::SharedPtr map_sub_;
   rclcpp::Subscription<TrafficSignalArray>::SharedPtr perception_tlr_sub_;
@@ -51,9 +52,11 @@ private:
   double external_time_tolerance_;
   double perception_time_tolerance_;
   bool external_priority_;
+  bool enable_signal_matching_;
 
   TrafficSignalArray latest_perception_msg_;
   TrafficSignalArray latest_external_msg_;
+  std::unique_ptr<SignalMatchValidator> signal_match_validator_;
 };
 
 #endif  // TRAFFIC_LIGHT_ARBITER__TRAFFIC_LIGHT_ARBITER_HPP_

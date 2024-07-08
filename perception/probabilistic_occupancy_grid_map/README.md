@@ -9,6 +9,7 @@ This package outputs the probability of having an obstacle as occupancy grid map
 
 - [Pointcloud based occupancy grid map](pointcloud-based-occupancy-grid-map.md)
 - [Laserscan based occupancy grid map](laserscan-based-occupancy-grid-map.md)
+- [Grid map fusion](synchronized_grid_map_fusion.md)
 
 ## Settings
 
@@ -70,3 +71,39 @@ Additional argument is shown below:
 | `container_name`                    | `occupancy_grid_map_container` |                                                                                               |
 | `input_obstacle_pointcloud`         | `false`                        | only for laserscan based method. If true, the node subscribe obstacle pointcloud              |
 | `input_obstacle_and_raw_pointcloud` | `true`                         | only for laserscan based method. If true, the node subscribe both obstacle and raw pointcloud |
+
+### Downsample input pointcloud(Optional)
+
+If you set `downsample_input_pointcloud` to `true`, the input pointcloud will be downsampled and following topics are also used. This feature is currently only for the pointcloud based occupancy grid map.
+
+- pointcloud_based_occupancy_grid_map method
+
+```yaml
+# downsampled raw and obstacle pointcloud
+/perception/occupancy_grid_map/obstacle/downsample/pointcloud
+/perception/occupancy_grid_map/raw/downsample/pointcloud
+```
+
+- multi_lidar_pointcloud_based_point_cloud
+
+```yaml
+# downsampled raw and obstacle pointcloud
+/perception/occupancy_grid_map/obstacle/downsample/pointcloud
+/perception/occupancy_grid_map/<sensor_name>/raw/downsample/pointcloud
+```
+
+### Test
+
+This package provides unit tests using `gtest`.
+You can run the test by the following command.
+
+```bash
+colcon test --packages-select probabilistic_occupancy_grid_map --event-handlers console_direct+
+```
+
+Test contains the following.
+
+- Unit test for cost value conversion function
+- Unit test for utility functions
+- Unit test for occupancy grid map fusion functions
+- Input/Output test for pointcloud based occupancy grid map

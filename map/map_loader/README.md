@@ -20,7 +20,7 @@ NOTE: **We strongly recommend to use divided maps when using large pointcloud ma
 
 #### Prerequisites on pointcloud map file(s)
 
-You may provide either a single .pcd file or multiple .pcd files. If you are using multiple PCD data and either of `enable_partial_load`, `enable_differential_load` or `enable_selected_load` are set true, it MUST obey the following rules:
+You may provide either a single .pcd file or multiple .pcd files. If you are using multiple PCD data, it MUST obey the following rules:
 
 1. **The pointcloud map should be projected on the same coordinate defined in `map_projection_loader`**, in order to be consistent with the lanelet2 map and other packages that converts between local and geodetic coordinates. For more information, please refer to [the readme of `map_projection_loader`](https://github.com/autowarefoundation/autoware.universe/tree/main/map/map_projection_loader/README.md).
 2. **It must be divided by straight lines parallel to the x-axis and y-axis**. The system does not support division by diagonal lines or curved lines.
@@ -28,8 +28,6 @@ You may provide either a single .pcd file or multiple .pcd files. If you are usi
 4. **The division size should be about 20m x 20m.** Particularly, care should be taken as using too large division size (for example, more than 100m) may have adverse effects on dynamic map loading features in [ndt_scan_matcher](https://github.com/autowarefoundation/autoware.universe/tree/main/localization/ndt_scan_matcher) and [compare_map_segmentation](https://github.com/autowarefoundation/autoware.universe/tree/main/perception/compare_map_segmentation).
 5. **All the split maps should not overlap with each other.**
 6. **Metadata file should also be provided.** The metadata structure description is provided below.
-
-Note that these rules are not applicable when `enable_partial_load`, `enable_differential_load` and `enable_selected_load` are all set false. In this case, however, you also need to disable dynamic map loading mode for other nodes as well ([ndt_scan_matcher](https://github.com/autowarefoundation/autoware.universe/tree/main/localization/ndt_scan_matcher) and [compare_map_segmentation](https://github.com/autowarefoundation/autoware.universe/tree/main/perception/compare_map_segmentation) as of June 2023).
 
 #### Metadata structure
 
@@ -113,16 +111,7 @@ Please see [the description of `GetSelectedPointCloudMap.srv`](https://github.co
 
 ### Parameters
 
-| Name                          | Type        | Description                                                                       | Default value |
-| :---------------------------- | :---------- | :-------------------------------------------------------------------------------- | :------------ |
-| enable_whole_load             | bool        | A flag to enable raw pointcloud map publishing                                    | true          |
-| enable_downsampled_whole_load | bool        | A flag to enable downsampled pointcloud map publishing                            | false         |
-| enable_partial_load           | bool        | A flag to enable partial pointcloud map server                                    | false         |
-| enable_differential_load      | bool        | A flag to enable differential pointcloud map server                               | false         |
-| enable_selected_load          | bool        | A flag to enable selected pointcloud map server                                   | false         |
-| leaf_size                     | float       | Downsampling leaf size (only used when enable_downsampled_whole_load is set true) | 3.0           |
-| pcd_paths_or_directory        | std::string | Path(s) to pointcloud map file or directory                                       |               |
-| pcd_metadata_path             | std::string | Path to pointcloud metadata file                                                  |               |
+{{ json_to_markdown("map/map_loader/schema/pointcloud_map_loader.schema.json") }}
 
 ### Interfaces
 
@@ -141,7 +130,7 @@ Please see [the description of `GetSelectedPointCloudMap.srv`](https://github.co
 
 ### Feature
 
-lanelet2_map_loader loads Lanelet2 file and publishes the map data as autoware_auto_mapping_msgs/HADMapBin message.
+lanelet2_map_loader loads Lanelet2 file and publishes the map data as autoware_map_msgs/LaneletMapBin message.
 The node projects lan/lon coordinates into arbitrary coordinates defined in `/map/map_projector_info` from `map_projection_loader`.
 Please see [tier4_autoware_msgs/msg/MapProjectorInfo.msg](https://github.com/tier4/tier4_autoware_msgs/blob/tier4/universe/tier4_map_msgs/msg/MapProjectorInfo.msg) for supported projector types.
 
@@ -155,14 +144,14 @@ Please see [tier4_autoware_msgs/msg/MapProjectorInfo.msg](https://github.com/tie
 
 ### Published Topics
 
-- ~output/lanelet2_map (autoware_auto_mapping_msgs/HADMapBin) : Binary data of loaded Lanelet2 Map
+- ~output/lanelet2_map (autoware_map_msgs/LaneletMapBin) : Binary data of loaded Lanelet2 Map
 
 ### Parameters
 
-| Name                   | Type        | Description                                      | Default value |
-| :--------------------- | :---------- | :----------------------------------------------- | :------------ |
-| center_line_resolution | double      | Define the resolution of the lanelet center line | 5.0           |
-| lanelet2_map_path      | std::string | The lanelet2 map path                            | None          |
+{{ json_to_markdown("map/map_loader/schema/lanelet2_map_loader.schema.json") }}
+
+`use_waypoints` decides how to handle a centerline.
+This flag enables to use the `overwriteLaneletsCenterlineWithWaypoints` function instead of `overwriteLaneletsCenterline`. Please see [the document of the autoware_lanelet2_extension package](https://github.com/autowarefoundation/autoware_lanelet2_extension/blob/main/autoware_lanelet2_extension/docs/lanelet2_format_extension.md#centerline) in detail.
 
 ---
 
@@ -170,7 +159,7 @@ Please see [tier4_autoware_msgs/msg/MapProjectorInfo.msg](https://github.com/tie
 
 ### Feature
 
-lanelet2_map_visualization visualizes autoware_auto_mapping_msgs/HADMapBin messages into visualization_msgs/MarkerArray.
+lanelet2_map_visualization visualizes autoware_map_msgs/LaneletMapBin messages into visualization_msgs/MarkerArray.
 
 ### How to Run
 
@@ -178,7 +167,7 @@ lanelet2_map_visualization visualizes autoware_auto_mapping_msgs/HADMapBin messa
 
 ### Subscribed Topics
 
-- ~input/lanelet2_map (autoware_auto_mapping_msgs/HADMapBin) : binary data of Lanelet2 Map
+- ~input/lanelet2_map (autoware_map_msgs/LaneletMapBin) : binary data of Lanelet2 Map
 
 ### Published Topics
 

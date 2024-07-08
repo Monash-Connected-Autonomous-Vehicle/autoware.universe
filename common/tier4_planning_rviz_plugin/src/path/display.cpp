@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <path/display.hpp>
+#include "tier4_planning_rviz_plugin/path/display.hpp"
+
 #include <pluginlib/class_list_macros.hpp>
 
 namespace rviz_plugins
@@ -30,7 +31,7 @@ void AutowarePathWithLaneIdDisplay::preProcessMessageDetail()
   if (!vehicle_info_) {
     try {
       vehicle_info_ = std::make_shared<VehicleInfo>(
-        VehicleInfoUtil(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
+        VehicleInfoUtils(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
       updateVehicleInfo();
     } catch (const std::exception & e) {
       RCLCPP_WARN_ONCE(
@@ -50,7 +51,7 @@ AutowarePathWithLaneIdDisplay::~AutowarePathWithLaneIdDisplay()
 }
 
 void AutowarePathWithLaneIdDisplay::preVisualizePathFootprintDetail(
-  const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr msg_ptr)
+  const tier4_planning_msgs::msg::PathWithLaneId::ConstSharedPtr msg_ptr)
 {
   const size_t size = msg_ptr->points.size();
   // clear previous text
@@ -72,8 +73,7 @@ void AutowarePathWithLaneIdDisplay::preVisualizePathFootprintDetail(
 }
 
 void AutowarePathWithLaneIdDisplay::visualizePathFootprintDetail(
-  const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr msg_ptr,
-  const size_t p_idx)
+  const tier4_planning_msgs::msg::PathWithLaneId::ConstSharedPtr msg_ptr, const size_t p_idx)
 {
   const auto & point = msg_ptr->points.at(p_idx);
 
@@ -107,7 +107,7 @@ void AutowarePathDisplay::preProcessMessageDetail()
   if (!vehicle_info_) {
     try {
       vehicle_info_ = std::make_shared<VehicleInfo>(
-        VehicleInfoUtil(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
+        VehicleInfoUtils(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
       updateVehicleInfo();
     } catch (const std::exception & e) {
       RCLCPP_WARN_ONCE(
@@ -124,7 +124,7 @@ void AutowareTrajectoryDisplay::preProcessMessageDetail()
   if (!vehicle_info_) {
     try {
       vehicle_info_ = std::make_shared<VehicleInfo>(
-        VehicleInfoUtil(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
+        VehicleInfoUtils(*rviz_ros_node_.lock()->get_raw_node()).getVehicleInfo());
       updateVehicleInfo();
     } catch (const std::exception & e) {
       RCLCPP_WARN_ONCE(

@@ -21,7 +21,6 @@ from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
-from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
@@ -41,7 +40,7 @@ class GroundSegmentationPipeline:
             self.ground_segmentation_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
         self.single_frame_obstacle_seg_output = (
-            "/perception/obstacle_segmentation/single_frame/pointcloud_raw"
+            "/perception/obstacle_segmentation/single_frame/pointcloud"
         )
         self.output_topic = "/perception/obstacle_segmentation/pointcloud"
         self.use_single_frame_filter = self.ground_segmentation_param["use_single_frame_filter"]
@@ -71,6 +70,24 @@ class GroundSegmentationPipeline:
         return p
 
     def create_additional_pipeline(self, lidar_name):
+        max_z = (
+            self.vehicle_info["max_height_offset"]
+            + self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"][
+                "margin_max_z"
+            ]
+        )
+        min_z = (
+            self.vehicle_info["min_height_offset"]
+            + self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"][
+                "margin_min_z"
+            ]
+        )
+        # Get the plugin name from the full plugin path
+        ground_segmentation_plugin_name = self.ground_segmentation_param[
+            f"{lidar_name}_ground_filter"
+        ]["plugin"]
+        ground_segmentation_plugin_name = ground_segmentation_plugin_name.split("::")[-1]
+
         components = []
         components.append(
             ComposableNode(
@@ -78,13 +95,15 @@ class GroundSegmentationPipeline:
                 plugin="pointcloud_preprocessor::CropBoxFilterComponent",
                 name=f"{lidar_name}_crop_box_filter",
                 remappings=[
-                    ("input", f"/sensing/lidar/{lidar_name}/outlier_filtered/pointcloud"),
+                    ("input", f"/sensing/lidar/{lidar_name}/pointcloud"),
                     ("output", f"{lidar_name}/range_cropped/pointcloud"),
                 ],
                 parameters=[
                     {
                         "input_frame": LaunchConfiguration("base_frame"),
                         "output_frame": LaunchConfiguration("base_frame"),
+                        "max_z": max_z,
+                        "min_z": min_z,
                     },
                     self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"],
                 ],
@@ -97,7 +116,7 @@ class GroundSegmentationPipeline:
         components.append(
             ComposableNode(
                 package="ground_segmentation",
-                plugin=self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"],
+                plugin="autoware::ground_segmentation::" + ground_segmentation_plugin_name,
                 name=f"{lidar_name}_ground_filter",
                 remappings=[
                     ("input", f"{lidar_name}/range_cropped/pointcloud"),
@@ -190,7 +209,7 @@ class GroundSegmentationPipeline:
         components.append(
             ComposableNode(
                 package="ground_segmentation",
-                plugin="ground_segmentation::RANSACGroundFilterComponent",
+                plugin="autoware::ground_segmentation::" + "RANSACGroundFilterComponent",
                 name="ransac_ground_filter",
                 namespace="plane_fitting",
                 remappings=[
@@ -207,6 +226,20 @@ class GroundSegmentationPipeline:
         return components
 
     def create_common_pipeline(self, input_topic, output_topic):
+        max_z = (
+            self.vehicle_info["max_height_offset"]
+            + self.ground_segmentation_param["common_crop_box_filter"]["parameters"]["margin_max_z"]
+        )
+        min_z = (
+            self.vehicle_info["min_height_offset"]
+            + self.ground_segmentation_param["common_crop_box_filter"]["parameters"]["margin_min_z"]
+        )
+        # Get the plugin name from the full plugin path
+        ground_segmentation_plugin_name = self.ground_segmentation_param["common_ground_filter"][
+            "plugin"
+        ]
+        ground_segmentation_plugin_name = ground_segmentation_plugin_name.split("::")[-1]
+
         components = []
         components.append(
             ComposableNode(
@@ -221,6 +254,8 @@ class GroundSegmentationPipeline:
                     {
                         "input_frame": LaunchConfiguration("base_frame"),
                         "output_frame": LaunchConfiguration("base_frame"),
+                        "max_z": max_z,
+                        "min_z": min_z,
                     },
                     self.ground_segmentation_param["common_crop_box_filter"]["parameters"],
                 ],
@@ -233,7 +268,7 @@ class GroundSegmentationPipeline:
         components.append(
             ComposableNode(
                 package="ground_segmentation",
-                plugin=self.ground_segmentation_param["common_ground_filter"]["plugin"],
+                plugin="autoware::ground_segmentation::" + ground_segmentation_plugin_name,
                 name="common_ground_filter",
                 remappings=[
                     ("input", "range_cropped/pointcloud"),
@@ -258,7 +293,7 @@ class GroundSegmentationPipeline:
         use_additional = bool(additional_lidars)
         relay_topic = "all_lidars/pointcloud"
         common_pipeline_output = (
-            "single_frame/pointcloud" if use_additional or use_ransac else output_topic
+            "common/pointcloud" if use_additional or use_ransac else output_topic
         )
 
         components = self.create_common_pipeline(
@@ -297,8 +332,8 @@ class GroundSegmentationPipeline:
         components.append(
             ComposableNode(
                 package="occupancy_grid_map_outlier_filter",
-                plugin="occupancy_grid_map_outlier_filter::OccupancyGridMapOutlierFilterComponent",
-                name="occupancy_grid_map_outlier_filter",
+                plugin="autoware::occupancy_grid_map_outlier_filter::OccupancyGridMapOutlierFilterComponent",
+                name="occupancy_grid_based_outlier_filter",
                 remappings=[
                     ("~/input/occupancy_grid_map", "/perception/occupancy_grid_map/map"),
                     ("~/input/pointcloud", input_topic),
@@ -478,9 +513,11 @@ def launch_setup(context, *args, **kwargs):
     components.extend(
         pipeline.create_single_frame_obstacle_segmentation_components(
             input_topic=LaunchConfiguration("input/pointcloud"),
-            output_topic=pipeline.single_frame_obstacle_seg_output
-            if pipeline.use_single_frame_filter or pipeline.use_time_series_filter
-            else pipeline.output_topic,
+            output_topic=(
+                pipeline.single_frame_obstacle_seg_output
+                if pipeline.use_single_frame_filter or pipeline.use_time_series_filter
+                else pipeline.output_topic
+            ),
         )
     )
 
@@ -489,36 +526,28 @@ def launch_setup(context, *args, **kwargs):
         components.extend(
             pipeline.create_single_frame_outlier_filter_components(
                 input_topic=pipeline.single_frame_obstacle_seg_output,
-                output_topic=relay_topic
-                if pipeline.use_time_series_filter
-                else pipeline.output_topic,
+                output_topic=(
+                    relay_topic if pipeline.use_time_series_filter else pipeline.output_topic
+                ),
                 context=context,
             )
         )
     if pipeline.use_time_series_filter:
         components.extend(
             pipeline.create_time_series_outlier_filter_components(
-                input_topic=relay_topic
-                if pipeline.use_single_frame_filter
-                else pipeline.single_frame_obstacle_seg_output,
+                input_topic=(
+                    relay_topic
+                    if pipeline.use_single_frame_filter
+                    else pipeline.single_frame_obstacle_seg_output
+                ),
                 output_topic=pipeline.output_topic,
             )
         )
-    individual_container = ComposableNodeContainer(
-        name=LaunchConfiguration("container_name"),
-        namespace="",
-        package="rclcpp_components",
-        executable=LaunchConfiguration("container_executable"),
-        composable_node_descriptions=components,
-        condition=UnlessCondition(LaunchConfiguration("use_pointcloud_container")),
-        output="screen",
-    )
     pointcloud_container_loader = LoadComposableNodes(
         composable_node_descriptions=components,
-        target_container=LaunchConfiguration("container_name"),
-        condition=IfCondition(LaunchConfiguration("use_pointcloud_container")),
+        target_container=LaunchConfiguration("pointcloud_container_name"),
     )
-    return [individual_container, pointcloud_container_loader]
+    return [pointcloud_container_loader]
 
 
 def generate_launch_description():
@@ -530,8 +559,7 @@ def generate_launch_description():
     add_launch_arg("base_frame", "base_link")
     add_launch_arg("use_multithread", "False")
     add_launch_arg("use_intra_process", "True")
-    add_launch_arg("use_pointcloud_container", "False")
-    add_launch_arg("container_name", "perception_pipeline_container")
+    add_launch_arg("pointcloud_container_name", "pointcloud_container")
     add_launch_arg("input/pointcloud", "/sensing/lidar/concatenated/pointcloud")
 
     set_container_executable = SetLaunchConfiguration(

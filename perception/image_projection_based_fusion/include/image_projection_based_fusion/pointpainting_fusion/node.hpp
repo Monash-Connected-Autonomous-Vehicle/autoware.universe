@@ -31,9 +31,18 @@
 
 namespace image_projection_based_fusion
 {
-using Label = autoware_auto_perception_msgs::msg::ObjectClassification;
+using Label = autoware_perception_msgs::msg::ObjectClassification;
 
-class PointPaintingFusionNode : public FusionNode<sensor_msgs::msg::PointCloud2, DetectedObjects>
+inline bool isInsideBbox(
+  float proj_x, float proj_y, sensor_msgs::msg::RegionOfInterest roi, float zc)
+{
+  // z_c is scaling to normalize projection point
+  return proj_x >= roi.x_offset * zc && proj_x <= (roi.x_offset + roi.width) * zc &&
+         proj_y >= roi.y_offset * zc && proj_y <= (roi.y_offset + roi.height) * zc;
+}
+
+class PointPaintingFusionNode
+: public FusionNode<sensor_msgs::msg::PointCloud2, DetectedObjects, DetectedObjectsWithFeature>
 {
 public:
   explicit PointPaintingFusionNode(const rclcpp::NodeOptions & options);
@@ -59,6 +68,7 @@ protected:
   std::map<std::string, float> class_index_;
   std::map<std::string, std::function<bool(int)>> isClassTable_;
   std::vector<double> pointcloud_range;
+  bool has_variance_{false};
   bool has_twist_{false};
 
   centerpoint::NonMaximumSuppression iou_bev_nms_;

@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "shape_estimation/corrector/utils.hpp"
+#define EIGEN_MPL2_ONLY
 
-#include <tier4_autoware_utils/geometry/geometry.hpp>
+#include "autoware/shape_estimation/corrector/utils.hpp"
+
+#include "autoware/universe_utils/geometry/geometry.hpp"
 
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -28,17 +30,19 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #endif
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <vector>
 
-#define EIGEN_MPL2_ONLY
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+namespace autoware::shape_estimation
+{
 
 namespace corrector_utils
 {
 bool correctWithDefaultValue(
-  const CorrectionBBParameters & param, autoware_auto_perception_msgs::msg::Shape & shape,
+  const CorrectionBBParameters & param, autoware_perception_msgs::msg::Shape & shape,
   geometry_msgs::msg::Pose & pose)
 {
   // TODO(Yukihiro Saito): refactor following code
@@ -246,9 +250,9 @@ bool correctWithDefaultValue(
 
   // correct to set long length is x, short length is y
   if (shape.dimensions.x < shape.dimensions.y) {
-    geometry_msgs::msg::Vector3 rpy = tier4_autoware_utils::getRPY(pose.orientation);
+    geometry_msgs::msg::Vector3 rpy = autoware::universe_utils::getRPY(pose.orientation);
     rpy.z = rpy.z + M_PI_2;
-    pose.orientation = tier4_autoware_utils::createQuaternionFromRPY(rpy.x, rpy.y, rpy.z);
+    pose.orientation = autoware::universe_utils::createQuaternionFromRPY(rpy.x, rpy.y, rpy.z);
     double temp = shape.dimensions.x;
     shape.dimensions.x = shape.dimensions.y;
     shape.dimensions.y = temp;
@@ -258,7 +262,7 @@ bool correctWithDefaultValue(
 }
 
 bool correctWithReferenceYaw(
-  const CorrectionBBParameters & param, autoware_auto_perception_msgs::msg::Shape & shape,
+  const CorrectionBBParameters & param, autoware_perception_msgs::msg::Shape & shape,
   geometry_msgs::msg::Pose & pose)
 {
   // TODO(Taichi Higashide): refactor following code
@@ -329,8 +333,8 @@ bool correctWithReferenceYaw(
 }
 
 bool correctWithReferenceYawAndShapeSize(
-  const ReferenceShapeSizeInfo & ref_shape_size_info,
-  autoware_auto_perception_msgs::msg::Shape & shape, geometry_msgs::msg::Pose & pose)
+  const ReferenceShapeSizeInfo & ref_shape_size_info, autoware_perception_msgs::msg::Shape & shape,
+  geometry_msgs::msg::Pose & pose)
 {
   /*
   c1 is nearest point and other points are arranged like below
@@ -398,3 +402,5 @@ bool correctWithReferenceYawAndShapeSize(
   return true;
 }
 }  // namespace corrector_utils
+
+}  // namespace autoware::shape_estimation

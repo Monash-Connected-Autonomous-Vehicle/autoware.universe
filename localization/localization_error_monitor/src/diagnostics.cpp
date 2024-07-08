@@ -17,13 +17,13 @@
 #include <string>
 #include <vector>
 
-diagnostic_msgs::msg::DiagnosticStatus checkLocalizationAccuracy(
+diagnostic_msgs::msg::DiagnosticStatus check_localization_accuracy(
   const double ellipse_size, const double warn_ellipse_size, const double error_ellipse_size)
 {
   diagnostic_msgs::msg::DiagnosticStatus stat;
 
   diagnostic_msgs::msg::KeyValue key_value;
-  key_value.key = "localization_accuracy";
+  key_value.key = "localization_error_ellipse";
   key_value.value = std::to_string(ellipse_size);
   stat.values.push_back(key_value);
 
@@ -41,13 +41,13 @@ diagnostic_msgs::msg::DiagnosticStatus checkLocalizationAccuracy(
   return stat;
 }
 
-diagnostic_msgs::msg::DiagnosticStatus checkLocalizationAccuracyLateralDirection(
+diagnostic_msgs::msg::DiagnosticStatus check_localization_accuracy_lateral_direction(
   const double ellipse_size, const double warn_ellipse_size, const double error_ellipse_size)
 {
   diagnostic_msgs::msg::DiagnosticStatus stat;
 
   diagnostic_msgs::msg::KeyValue key_value;
-  key_value.key = "localization_accuracy_lateral_direction";
+  key_value.key = "localization_error_ellipse_lateral_direction";
   key_value.value = std::to_string(ellipse_size);
   stat.values.push_back(key_value);
 
@@ -66,7 +66,7 @@ diagnostic_msgs::msg::DiagnosticStatus checkLocalizationAccuracyLateralDirection
 }
 
 // The highest level within the stat_array will be reflected in the merged_stat.
-diagnostic_msgs::msg::DiagnosticStatus mergeDiagnosticStatus(
+diagnostic_msgs::msg::DiagnosticStatus merge_diagnostic_status(
   const std::vector<diagnostic_msgs::msg::DiagnosticStatus> & stat_array)
 {
   diagnostic_msgs::msg::DiagnosticStatus merged_stat;

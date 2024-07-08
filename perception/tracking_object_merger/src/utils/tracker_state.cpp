@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "tracking_object_merger/utils/tracker_state.hpp"
+#include "autoware_tracking_object_merger/utils/tracker_state.hpp"
 
-#include "tracking_object_merger/utils/utils.hpp"
+#include "autoware_tracking_object_merger/utils/utils.hpp"
 
-using autoware_auto_perception_msgs::msg::TrackedObject;
-using autoware_auto_perception_msgs::msg::TrackedObjects;
+namespace autoware::tracking_object_merger
+{
+
+using autoware_perception_msgs::msg::TrackedObject;
+using autoware_perception_msgs::msg::TrackedObjects;
 
 /**
  * @brief Construct a new Tracker State:: Tracker State object
@@ -28,7 +31,7 @@ using autoware_auto_perception_msgs::msg::TrackedObjects;
  */
 TrackerState::TrackerState(
   const MEASUREMENT_STATE input_source, const rclcpp::Time & last_update_time,
-  const autoware_auto_perception_msgs::msg::TrackedObject & tracked_object)
+  const autoware_perception_msgs::msg::TrackedObject & tracked_object)
 : tracked_object_(tracked_object),
   last_update_time_(last_update_time),
   const_uuid_(tracked_object.object_id),
@@ -41,7 +44,7 @@ TrackerState::TrackerState(
 
 TrackerState::TrackerState(
   const MEASUREMENT_STATE input_source, const rclcpp::Time & last_update_time,
-  const autoware_auto_perception_msgs::msg::TrackedObject & tracked_object,
+  const autoware_perception_msgs::msg::TrackedObject & tracked_object,
   const unique_identifier_msgs::msg::UUID & uuid)
 : tracked_object_(tracked_object),
   last_update_time_(last_update_time),
@@ -271,8 +274,14 @@ bool TrackerState::hasUUID(
   return input_uuid_map_.at(input) == uuid;
 }
 
-bool TrackerState::isValid() const
+bool TrackerState::isValid(const rclcpp::Time & current_time) const
 {
+  // check dt from last update
+  double dt = (current_time - last_update_time_).seconds();
+  if (std::abs(dt) > max_dt_) {
+    return false;
+  }
+
   // check if tracker state is valid
   if (existence_probability_ < remove_probability_threshold_) {
     return false;
@@ -302,7 +311,7 @@ TrackedObjects getTrackedObjectsFromTrackerStates(
   // sanitize and get tracked objects
   for (auto it = tracker_states.begin(); it != tracker_states.end();) {
     // check if tracker state is valid
-    if (it->isValid()) {
+    if (it->isValid(current_time)) {
       if (it->canPublish()) {
         // if valid, get tracked object
         tracked_objects.objects.push_back(it->getObject());
@@ -319,3 +328,5 @@ TrackedObjects getTrackedObjectsFromTrackerStates(
   tracked_objects.header.frame_id = "map";  // TODO(yoshiri): get frame_id from input
   return tracked_objects;
 }
+
+}  // namespace autoware::tracking_object_merger

@@ -12,6 +12,7 @@ endif()
 ### Find Eigen Dependencies
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(glog REQUIRED)
 
 include_directories(
   SYSTEM
@@ -19,32 +20,44 @@ include_directories(
 )
 
 # Generate exe file
-set(MULTI_OBJECT_TRACKER_SRC
-  src/multi_object_tracker_core.cpp
-  src/tracker/model/tracker_base.cpp
-  src/tracker/model/big_vehicle_tracker.cpp
-  src/tracker/model/normal_vehicle_tracker.cpp
-  src/tracker/model/multiple_vehicle_tracker.cpp
-  src/tracker/model/bicycle_tracker.cpp
-  src/tracker/model/pedestrian_tracker.cpp
-  src/tracker/model/pedestrian_and_bicycle_tracker.cpp
-  src/tracker/model/unknown_tracker.cpp
-  src/tracker/model/pass_through_tracker.cpp
-  src/data_association/data_association.cpp
-  src/data_association/mu_successive_shortest_path/mu_successive_shortest_path_wrapper.cpp
+set(${PROJECT_NAME}_src
+  src/multi_object_tracker_node.cpp
+  src/debugger/debugger.cpp
+  src/debugger/debug_object.cpp
+  src/processor/processor.cpp
+  src/processor/input_manager.cpp
+)
+set(${PROJECT_NAME}_lib
+  lib/association/association.cpp
+  lib/association/mu_successive_shortest_path/mu_ssp.cpp
+  lib/tracker/motion_model/motion_model_base.cpp
+  lib/tracker/motion_model/bicycle_motion_model.cpp
+  # cspell: ignore ctrv
+  lib/tracker/motion_model/ctrv_motion_model.cpp
+  lib/tracker/motion_model/cv_motion_model.cpp
+  lib/tracker/model/tracker_base.cpp
+  lib/tracker/model/big_vehicle_tracker.cpp
+  lib/tracker/model/normal_vehicle_tracker.cpp
+  lib/tracker/model/multiple_vehicle_tracker.cpp
+  lib/tracker/model/bicycle_tracker.cpp
+  lib/tracker/model/pedestrian_tracker.cpp
+  lib/tracker/model/pedestrian_and_bicycle_tracker.cpp
+  lib/tracker/model/unknown_tracker.cpp
+  lib/tracker/model/pass_through_tracker.cpp
+)
+ament_auto_add_library(${PROJECT_NAME} SHARED
+  ${${PROJECT_NAME}_src}
+  ${${PROJECT_NAME}_lib}
 )
 
-ament_auto_add_library(multi_object_tracker_node SHARED
-  ${MULTI_OBJECT_TRACKER_SRC}
-)
-
-target_link_libraries(multi_object_tracker_node
+target_link_libraries(${PROJECT_NAME}
   Eigen3::Eigen
+  glog::glog
 )
 
-rclcpp_components_register_node(multi_object_tracker_node
-  PLUGIN "MultiObjectTracker"
-  EXECUTABLE multi_object_tracker
+rclcpp_components_register_node(${PROJECT_NAME}
+  PLUGIN "autoware::multi_object_tracker::MultiObjectTracker"
+  EXECUTABLE multi_object_tracker_node
 )
 
 ament_auto_package(INSTALL_TO_SHARE

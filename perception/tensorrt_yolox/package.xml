@@ -5,7 +5,6 @@
   <description>tensorrt library implementation for yolox</description>
 
   <author email="daisuke.nishimatsu@tier4.jp">Daisuke Nishimatsu</author>
-  <maintainer email="daisuke.nishimatsu@tier4.jp">Daisuke Nishimatsu</maintainer>
   <maintainer email="dan.umeda@tier4.jp">Dan Umeda</maintainer>
   <maintainer email="manato.hirabayashi@tier4.jp">Manato Hirabayashi</maintainer>
 
@@ -19,7 +18,7 @@
   <buildtool_export_depend>cudnn_cmake_module</buildtool_export_depend>
   <buildtool_export_depend>tensorrt_cmake_module</buildtool_export_depend>
 
-  <depend>autoware_auto_perception_msgs</depend>
+  <depend>autoware_perception_msgs</depend>
   <depend>cuda_utils</depend>
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>

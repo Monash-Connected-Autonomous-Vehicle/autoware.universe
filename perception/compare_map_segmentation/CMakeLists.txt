@@ -44,7 +44,7 @@ ament_target_dependencies(compare_map_segmentation
   rclcpp
   rclcpp_components
   sensor_msgs
-  tier4_autoware_utils
+  autoware_universe_utils
   autoware_map_msgs
   nav_msgs
 )
@@ -89,6 +89,8 @@ install(
   RUNTIME DESTINATION bin
 )
 
-ament_auto_package(INSTALL_TO_SHARE
+ament_auto_package(
+  INSTALL_TO_SHARE
   launch
+  config
 )

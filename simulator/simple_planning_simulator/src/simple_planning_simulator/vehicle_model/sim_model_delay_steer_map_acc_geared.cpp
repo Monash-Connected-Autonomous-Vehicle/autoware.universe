@@ -14,14 +14,14 @@
 
 #include "simple_planning_simulator/vehicle_model/sim_model_delay_steer_map_acc_geared.hpp"
 
-#include "autoware_auto_vehicle_msgs/msg/gear_command.hpp"
+#include "autoware_vehicle_msgs/msg/gear_command.hpp"
 
 #include <algorithm>
 
 SimModelDelaySteerMapAccGeared::SimModelDelaySteerMapAccGeared(
   double vx_lim, double steer_lim, double vx_rate_lim, double steer_rate_lim, double wheelbase,
   double dt, double acc_delay, double acc_time_constant, double steer_delay,
-  double steer_time_constant, std::string path)
+  double steer_time_constant, double steer_bias, std::string path)
 : SimModelInterface(6 /* dim x */, 2 /* dim u */),
   MIN_TIME_CONSTANT(0.03),
   vx_lim_(vx_lim),
@@ -33,6 +33,7 @@ SimModelDelaySteerMapAccGeared::SimModelDelaySteerMapAccGeared(
   acc_time_constant_(std::max(acc_time_constant, MIN_TIME_CONSTANT)),
   steer_delay_(steer_delay),
   steer_time_constant_(std::max(steer_time_constant, MIN_TIME_CONSTANT)),
+  steer_bias_(steer_bias),
   path_(path)
 {
   initializeInputQueue(dt);
@@ -69,7 +70,7 @@ double SimModelDelaySteerMapAccGeared::getWz()
 }
 double SimModelDelaySteerMapAccGeared::getSteer()
 {
-  return state_(IDX::STEER);
+  return state_(IDX::STEER) + steer_bias_;
 }
 void SimModelDelaySteerMapAccGeared::update(const double & dt)
 {
@@ -113,7 +114,7 @@ Eigen::VectorXd SimModelDelaySteerMapAccGeared::calcModel(
   const double steer = state(IDX::STEER);
   const double acc_des = std::clamp(input(IDX_U::ACCX_DES), -vx_rate_lim_, vx_rate_lim_);
   const double steer_des = std::clamp(input(IDX_U::STEER_DES), -steer_lim_, steer_lim_);
-  double steer_rate = -(steer - steer_des) / steer_time_constant_;
+  double steer_rate = -(getSteer() - steer_des) / steer_time_constant_;
   steer_rate = std::clamp(steer_rate, -steer_rate_lim_, steer_rate_lim_);
 
   Eigen::VectorXd d_state = Eigen::VectorXd::Zero(dim_x_);
@@ -133,7 +134,7 @@ Eigen::VectorXd SimModelDelaySteerMapAccGeared::calcModel(
 void SimModelDelaySteerMapAccGeared::updateStateWithGear(
   Eigen::VectorXd & state, const Eigen::VectorXd & prev_state, const uint8_t gear, const double dt)
 {
-  using autoware_auto_vehicle_msgs::msg::GearCommand;
+  using autoware_vehicle_msgs::msg::GearCommand;
   if (
     gear == GearCommand::DRIVE || gear == GearCommand::DRIVE_2 || gear == GearCommand::DRIVE_3 ||
     gear == GearCommand::DRIVE_4 || gear == GearCommand::DRIVE_5 || gear == GearCommand::DRIVE_6 ||
@@ -158,13 +159,7 @@ void SimModelDelaySteerMapAccGeared::updateStateWithGear(
       state(IDX::YAW) = prev_state(IDX::YAW);
       state(IDX::ACCX) = (state(IDX::VX) - prev_state(IDX::VX)) / std::max(dt, 1.0e-5);
     }
-  } else if (gear == GearCommand::PARK) {
-    state(IDX::VX) = 0.0;
-    state(IDX::X) = prev_state(IDX::X);
-    state(IDX::Y) = prev_state(IDX::Y);
-    state(IDX::YAW) = prev_state(IDX::YAW);
-    state(IDX::ACCX) = (state(IDX::VX) - prev_state(IDX::VX)) / std::max(dt, 1.0e-5);
-  } else {
+  } else {  // including 'gear == GearCommand::PARK'
     state(IDX::VX) = 0.0;
     state(IDX::X) = prev_state(IDX::X);
     state(IDX::Y) = prev_state(IDX::Y);

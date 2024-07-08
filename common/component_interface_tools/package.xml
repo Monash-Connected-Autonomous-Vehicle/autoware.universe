@@ -5,8 +5,6 @@
   <version>0.1.0</version>
   <description>The component_interface_tools package</description>
   <maintainer email="isamu.takagi@tier4.jp">Takagi, Isamu</maintainer>
-  <maintainer email="makoto.yabuta@tier4.jp">yabuta</maintainer>
-  <maintainer email="kahhooi.tan@tier4.jp">Kah Hooi Tan</maintainer>
   <license>Apache License 2.0</license>
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
@@ -15,6 +13,7 @@
   <depend>diagnostic_updater</depend>
   <depend>fmt</depend>
   <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
   <depend>tier4_system_msgs</depend>
   <depend>yaml_cpp_vendor</depend>
 

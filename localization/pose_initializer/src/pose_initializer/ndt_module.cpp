@@ -23,9 +23,9 @@ using ServiceException = component_interface_utils::ServiceException;
 using Initialize = localization_interface::Initialize;
 using PoseWithCovarianceStamped = geometry_msgs::msg::PoseWithCovarianceStamped;
 
-NdtModule::NdtModule(rclcpp::Node * node) : logger_(node->get_logger())
+NdtModule::NdtModule(rclcpp::Node * node)
+: logger_(node->get_logger()), cli_align_(node->create_client<RequestPoseAlignment>("ndt_align"))
 {
-  cli_align_ = node->create_client<RequestPoseAlignment>("ndt_align");
 }
 
 PoseWithCovarianceStamped NdtModule::align_pose(const PoseWithCovarianceStamped & pose)
@@ -40,7 +40,6 @@ PoseWithCovarianceStamped NdtModule::align_pose(const PoseWithCovarianceStamped 
   RCLCPP_INFO(logger_, "Call NDT align server.");
   const auto res = cli_align_->async_send_request(req).get();
   if (!res->success) {
-    RCLCPP_INFO(logger_, "NDT align server failed.");
     throw ServiceException(
       Initialize::Service::Response::ERROR_ESTIMATION, "NDT align server failed.");
   }

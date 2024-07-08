@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "shape_estimation/model/bounding_box.hpp"
+#define EIGEN_MPL2_ONLY
+
+#include "autoware/shape_estimation/model/bounding_box.hpp"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <autoware_auto_perception_msgs/msg/shape.hpp>
+#include "autoware_perception_msgs/msg/shape.hpp"
 
 #include <boost/math/tools/minima.hpp>
 
@@ -33,14 +35,17 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #endif
 
+#include <Eigen/Core>
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
 #include <vector>
 
-#define EIGEN_MPL2_ONLY
-
-#include <Eigen/Core>
+namespace autoware::shape_estimation
+{
+namespace model
+{
 
 constexpr float epsilon = 0.001;
 
@@ -57,7 +62,7 @@ BoundingBoxShapeModel::BoundingBoxShapeModel(
 
 bool BoundingBoxShapeModel::estimate(
   const pcl::PointCloud<pcl::PointXYZ> & cluster,
-  autoware_auto_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
+  autoware_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
 {
   float min_angle, max_angle;
   if (ref_yaw_info_) {
@@ -72,7 +77,7 @@ bool BoundingBoxShapeModel::estimate(
 
 bool BoundingBoxShapeModel::fitLShape(
   const pcl::PointCloud<pcl::PointXYZ> & cluster, const float min_angle, const float max_angle,
-  autoware_auto_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
+  autoware_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
 {
   // calc min and max z for height
   float min_z = cluster.empty() ? 0.0 : cluster.at(0).z;
@@ -147,7 +152,7 @@ bool BoundingBoxShapeModel::fitLShape(
   quat.setEuler(/* roll */ 0, /* pitch */ 0, /* yaw */ std::atan2(e_1_star.y(), e_1_star.x()));
 
   // output
-  shape_output.type = autoware_auto_perception_msgs::msg::Shape::BOUNDING_BOX;
+  shape_output.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
   shape_output.dimensions.x = std::fabs(e_x.dot(diagonal_vec));
   shape_output.dimensions.y = std::fabs(e_y.dot(diagonal_vec));
   shape_output.dimensions.z = std::max((max_z - min_z), epsilon);
@@ -252,3 +257,6 @@ float BoundingBoxShapeModel::boostOptimize(
   float theta_star = min.first;
   return theta_star;
 }
+
+}  // namespace model
+}  // namespace autoware::shape_estimation

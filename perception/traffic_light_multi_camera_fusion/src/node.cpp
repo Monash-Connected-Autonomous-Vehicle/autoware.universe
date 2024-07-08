@@ -14,8 +14,8 @@
 
 #include "traffic_light_multi_camera_fusion/node.hpp"
 
-#include <lanelet2_extension/utility/message_conversion.hpp>
-#include <lanelet2_extension/utility/query.hpp>
+#include <autoware_lanelet2_extension/utility/message_conversion.hpp>
+#include <autoware_lanelet2_extension/utility/query.hpp>
 
 #include <algorithm>
 #include <memory>
@@ -25,7 +25,7 @@
 namespace
 {
 
-bool isUnknown(const tier4_perception_msgs::msg::TrafficSignal & signal)
+bool isUnknown(const tier4_perception_msgs::msg::TrafficLight & signal)
 {
   return signal.elements.size() == 1 &&
          signal.elements[0].color == tier4_perception_msgs::msg::TrafficLightElement::UNKNOWN &&
@@ -82,13 +82,9 @@ int compareRecord(const traffic_light::FusionRecord & r1, const traffic_light::F
   int visible_score_1 = calVisibleScore(r1);
   int visible_score_2 = calVisibleScore(r2);
   if (visible_score_1 == visible_score_2) {
-    int area_1 = r1.roi.roi.width * r1.roi.roi.height;
-    int area_2 = r2.roi.roi.width * r2.roi.roi.height;
-    if (area_1 < area_2) {
-      return -1;
-    } else {
-      return static_cast<int>(area_1 > area_2);
-    }
+    double confidence_1 = r1.signal.elements[0].confidence;
+    double confidence_2 = r2.signal.elements[0].confidence;
+    return confidence_1 < confidence_2 ? -1 : 1;
   } else {
     return visible_score_1 < visible_score_2 ? -1 : 1;
   }
@@ -100,11 +96,11 @@ V at_or(const std::unordered_map<K, V> & map, const K & key, const V & value)
   return map.count(key) ? map.at(key) : value;
 }
 
-autoware_perception_msgs::msg::TrafficSignalElement convert(
+autoware_perception_msgs::msg::TrafficLightElement convert(
   const tier4_perception_msgs::msg::TrafficLightElement & input)
 {
   typedef tier4_perception_msgs::msg::TrafficLightElement OldElem;
-  typedef autoware_perception_msgs::msg::TrafficSignalElement NewElem;
+  typedef autoware_perception_msgs::msg::TrafficLightElement NewElem;
   static const std::unordered_map<OldElem::_color_type, NewElem::_color_type> color_map(
     {{OldElem::RED, NewElem::RED},
      {OldElem::AMBER, NewElem::AMBER},
@@ -176,7 +172,7 @@ MultiCameraFusion::MultiCameraFusion(const rclcpp::NodeOptions & node_options)
     }
   }
 
-  map_sub_ = create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
+  map_sub_ = create_subscription<autoware_map_msgs::msg::LaneletMapBin>(
     "~/input/vector_map", rclcpp::QoS{1}.transient_local(),
     std::bind(&MultiCameraFusion::mapCallback, this, _1));
   signal_pub_ = create_publisher<NewSignalArrayType>("~/output/traffic_signals", rclcpp::QoS{1});
@@ -205,7 +201,7 @@ void MultiCameraFusion::trafficSignalRoiCallback(
 }
 
 void MultiCameraFusion::mapCallback(
-  const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr input_msg)
+  const autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr input_msg)
 {
   lanelet::LaneletMapPtr lanelet_map_ptr = std::make_shared<lanelet::LaneletMap>();
 
@@ -227,16 +223,16 @@ void MultiCameraFusion::mapCallback(
 void MultiCameraFusion::convertOutputMsg(
   const std::map<IdType, FusionRecord> & grouped_record_map, NewSignalArrayType & msg_out)
 {
-  msg_out.signals.clear();
+  msg_out.traffic_light_groups.clear();
   for (const auto & p : grouped_record_map) {
     IdType reg_ele_id = p.first;
     const SignalType & signal = p.second.signal;
     NewSignalType signal_out;
-    signal_out.traffic_signal_id = reg_ele_id;
+    signal_out.traffic_light_group_id = reg_ele_id;
     for (const auto & ele : signal.elements) {
       signal_out.elements.push_back(convert(ele));
     }
-    msg_out.signals.push_back(signal_out);
+    msg_out.traffic_light_groups.push_back(signal_out);
   }
 }
 

@@ -14,7 +14,7 @@
 //  limitations under the License.
 //
 
-#include "velocity_steering_factors_panel.hpp"
+#include "include/velocity_steering_factors_panel.hpp"
 
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -173,9 +173,6 @@ void VelocitySteeringFactorsPanel::onSteeringFactors(const SteeringFactorArray::
       switch (e.status) {
         case SteeringFactor::APPROACHING:
           label->setText("APPROACHING");
-          break;
-        case SteeringFactor::TRYING:
-          label->setText("TRYING");
           break;
         case SteeringFactor::TURNING:
           label->setText("TURNING");

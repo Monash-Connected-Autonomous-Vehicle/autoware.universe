@@ -12,19 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "shape_estimation/filter/utils.hpp"
+#include "autoware/shape_estimation/filter/utils.hpp"
+namespace autoware::shape_estimation
+{
 
 namespace utils
 {
 bool filterVehicleBoundingBox(
-  const autoware_auto_perception_msgs::msg::Shape & shape, const float min_width,
-  const float max_width, const float max_length)
+  const autoware_perception_msgs::msg::Shape & shape, const float min_width, const float max_width,
+  const float max_length)
 {
   const float x = shape.dimensions.x;
   const float y = shape.dimensions.y;
   const float s = x * y;
 
-  if (shape.type != autoware_auto_perception_msgs::msg::Shape::BOUNDING_BOX) {
+  if (shape.type != autoware_perception_msgs::msg::Shape::BOUNDING_BOX) {
     return true;
   }
   if (x < min_width && y < min_width) {
@@ -43,4 +45,6 @@ bool filterVehicleBoundingBox(
   }
   return true;
 }
+
 }  // namespace utils
+}  // namespace autoware::shape_estimation

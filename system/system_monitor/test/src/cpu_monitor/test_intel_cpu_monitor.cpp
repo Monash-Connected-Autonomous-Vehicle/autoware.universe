@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "system_monitor/cpu_monitor/intel_cpu_monitor.hpp"
+#include "system_monitor/msr_reader/msr_reader.hpp"
 
-#include <msr_reader/msr_reader.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -200,6 +200,7 @@ void * msr_reader(void * args)
   addr.sin_family = AF_INET;
   addr.sin_port = htons(7634);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // cppcheck-suppress cstyleCast
   ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (ret < 0) {
     close(sock);

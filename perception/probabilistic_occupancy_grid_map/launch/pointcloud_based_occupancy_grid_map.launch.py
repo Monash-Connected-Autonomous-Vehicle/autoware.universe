@@ -26,6 +26,47 @@ from launch_ros.descriptions import ComposableNode
 import yaml
 
 
+def get_downsample_filter_node(setting: dict) -> ComposableNode:
+    plugin_str = setting["plugin"]
+    voxel_size = setting["voxel_size"]
+    node_name = setting["node_name"]
+    return ComposableNode(
+        package="pointcloud_preprocessor",
+        plugin=plugin_str,
+        name=node_name,
+        remappings=[
+            ("input", setting["input_topic"]),
+            ("output", setting["output_topic"]),
+        ],
+        parameters=[
+            {
+                "voxel_size_x": voxel_size,
+                "voxel_size_y": voxel_size,
+                "voxel_size_z": voxel_size,
+            }
+        ],
+        extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
+    )
+
+
+def get_downsample_preprocess_nodes(voxel_size: float) -> list:
+    raw_settings = {
+        "plugin": "pointcloud_preprocessor::PickupBasedVoxelGridDownsampleFilterComponent",
+        "node_name": "raw_pc_downsample_filter",
+        "input_topic": LaunchConfiguration("input/raw_pointcloud"),
+        "output_topic": "raw/downsample/pointcloud",
+        "voxel_size": voxel_size,
+    }
+    obstacle_settings = {
+        "plugin": "pointcloud_preprocessor::PickupBasedVoxelGridDownsampleFilterComponent",
+        "node_name": "obstacle_pc_downsample_filter",
+        "input_topic": LaunchConfiguration("input/obstacle_pointcloud"),
+        "output_topic": "obstacle/downsample/pointcloud",
+        "voxel_size": voxel_size,
+    }
+    return [get_downsample_filter_node(raw_settings), get_downsample_filter_node(obstacle_settings)]
+
+
 def launch_setup(context, *args, **kwargs):
     # load parameter files
     param_file = LaunchConfiguration("param_file").perform(context)
@@ -38,19 +79,41 @@ def launch_setup(context, *args, **kwargs):
     with open(updater_param_file, "r") as f:
         occupancy_grid_map_updater_params = yaml.safe_load(f)["/**"]["ros__parameters"]
 
-    composable_nodes = [
+    # composable nodes
+    composable_nodes = []
+
+    # add downsample process
+    downsample_input_pointcloud: bool = pointcloud_based_occupancy_grid_map_node_params[
+        "downsample_input_pointcloud"
+    ]
+    if downsample_input_pointcloud:
+        voxel_grid_size: float = pointcloud_based_occupancy_grid_map_node_params[
+            "downsample_voxel_size"
+        ]
+        downsample_preprocess_nodes = get_downsample_preprocess_nodes(voxel_grid_size)
+        composable_nodes.extend(downsample_preprocess_nodes)
+
+    composable_nodes.append(
         ComposableNode(
             package="probabilistic_occupancy_grid_map",
-            plugin="occupancy_grid_map::PointcloudBasedOccupancyGridMapNode",
+            plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode",
             name="occupancy_grid_map_node",
             remappings=[
                 (
                     "~/input/obstacle_pointcloud",
-                    LaunchConfiguration("input/obstacle_pointcloud"),
+                    (
+                        LaunchConfiguration("input/obstacle_pointcloud")
+                        if not downsample_input_pointcloud
+                        else "obstacle/downsample/pointcloud"
+                    ),
                 ),
                 (
                     "~/input/raw_pointcloud",
-                    LaunchConfiguration("input/raw_pointcloud"),
+                    (
+                        LaunchConfiguration("input/raw_pointcloud")
+                        if not downsample_input_pointcloud
+                        else "raw/downsample/pointcloud"
+                    ),
                 ),
                 ("~/output/occupancy_grid_map", LaunchConfiguration("output")),
             ],
@@ -60,11 +123,11 @@ def launch_setup(context, *args, **kwargs):
                 {"updater_type": LaunchConfiguration("updater_type")},
             ],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
-        ),
-    ]
+        )
+    )
 
     occupancy_grid_map_container = ComposableNodeContainer(
-        name=LaunchConfiguration("container_name"),
+        name=LaunchConfiguration("individual_container_name"),
         namespace="",
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
@@ -75,7 +138,7 @@ def launch_setup(context, *args, **kwargs):
 
     load_composable_nodes = LoadComposableNodes(
         composable_node_descriptions=composable_nodes,
-        target_container=LaunchConfiguration("container_name"),
+        target_container=LaunchConfiguration("pointcloud_container_name"),
         condition=IfCondition(LaunchConfiguration("use_pointcloud_container")),
     )
 
@@ -103,7 +166,8 @@ def generate_launch_description():
             add_launch_arg("use_multithread", "false"),
             add_launch_arg("use_intra_process", "true"),
             add_launch_arg("use_pointcloud_container", "false"),
-            add_launch_arg("container_name", "occupancy_grid_map_container"),
+            add_launch_arg("pointcloud_container_name", "pointcloud_container"),
+            add_launch_arg("individual_container_name", "occupancy_grid_map_container"),
             add_launch_arg("input/obstacle_pointcloud", "no_ground/oneshot/pointcloud"),
             add_launch_arg("input/raw_pointcloud", "concatenated/pointcloud"),
             add_launch_arg("output", "occupancy_grid"),

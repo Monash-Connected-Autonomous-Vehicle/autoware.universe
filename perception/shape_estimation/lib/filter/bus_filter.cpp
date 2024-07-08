@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "shape_estimation/filter/bus_filter.hpp"
-
+#include "autoware/shape_estimation/filter/bus_filter.hpp"
+namespace autoware::shape_estimation
+{
+namespace filter
+{
 bool BusFilter::filter(
-  const autoware_auto_perception_msgs::msg::Shape & shape,
+  const autoware_perception_msgs::msg::Shape & shape,
   [[maybe_unused]] const geometry_msgs::msg::Pose & pose)
 {
   constexpr float min_width = 2.0;
@@ -23,3 +26,6 @@ bool BusFilter::filter(
   constexpr float max_length = 17.0;
   return utils::filterVehicleBoundingBox(shape, min_width, max_width, max_length);
 }
+
+}  // namespace filter
+}  // namespace autoware::shape_estimation

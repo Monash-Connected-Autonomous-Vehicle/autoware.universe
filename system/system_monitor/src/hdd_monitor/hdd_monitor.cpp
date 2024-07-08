@@ -19,9 +19,8 @@
 
 #include "system_monitor/hdd_monitor/hdd_monitor.hpp"
 
+#include "system_monitor/hdd_reader/hdd_reader.hpp"
 #include "system_monitor/system_monitor_utility.hpp"
-
-#include <hdd_reader/hdd_reader.hpp>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -616,6 +615,7 @@ void HddMonitor::updateHddInfoList()
   addr.sin_family = AF_INET;
   addr.sin_port = htons(hdd_reader_port_);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // cppcheck-suppress cstyleCast
   ret = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (ret < 0) {
     connect_diag_.summary(DiagStatus::ERROR, "connect error");
@@ -855,6 +855,7 @@ int HddMonitor::unmountDevice(std::string & device)
   addr.sin_family = AF_INET;
   addr.sin_port = htons(hdd_reader_port_);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  // cppcheck-suppress cstyleCast
   ret = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (ret < 0) {
     RCLCPP_ERROR(get_logger(), "socket connect error. %s", strerror(errno));

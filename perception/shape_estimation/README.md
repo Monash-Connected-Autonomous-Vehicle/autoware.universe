@@ -30,17 +30,13 @@ This node calculates a refined object shape (bounding box, cylinder, convex hull
 
 ### Output
 
-| Name             | Type                                                  | Description                         |
-| ---------------- | ----------------------------------------------------- | ----------------------------------- |
-| `output/objects` | `autoware_auto_perception_msgs::msg::DetectedObjects` | detected objects with refined shape |
+| Name             | Type                                             | Description                         |
+| ---------------- | ------------------------------------------------ | ----------------------------------- |
+| `output/objects` | `autoware_perception_msgs::msg::DetectedObjects` | detected objects with refined shape |
 
 ## Parameters
 
-| Name                        | Type | Default Value | Description                                         |
-| --------------------------- | ---- | ------------- | --------------------------------------------------- |
-| `use_corrector`             | bool | true          | The flag to apply rule-based filter                 |
-| `use_filter`                | bool | true          | The flag to apply rule-based corrector              |
-| `use_vehicle_reference_yaw` | bool | true          | The flag to use vehicle reference yaw for corrector |
+{{ json_to_markdown("perception/autoware/shape_estimation/schema/shape_estimation.schema.json") }}
 
 ## Assumptions / Known limits
 

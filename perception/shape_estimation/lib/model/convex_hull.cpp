@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "shape_estimation/model/convex_hull.hpp"
+#include "autoware/shape_estimation/model/convex_hull.hpp"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <autoware_auto_perception_msgs/msg/shape.hpp>
+#include <autoware_perception_msgs/msg/shape.hpp>
 #include <geometry_msgs/msg/point32.hpp>
 
 #include <pcl/point_cloud.h>
@@ -28,9 +28,14 @@
 #include <algorithm>
 #include <vector>
 
+namespace autoware::shape_estimation
+{
+namespace model
+{
+
 bool ConvexHullShapeModel::estimate(
   const pcl::PointCloud<pcl::PointXYZ> & cluster,
-  autoware_auto_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
+  autoware_perception_msgs::msg::Shape & shape_output, geometry_msgs::msg::Pose & pose_output)
 {
   // calc centroid point for convex hull height(z)
   pcl::PointXYZ centroid;
@@ -81,7 +86,7 @@ bool ConvexHullShapeModel::estimate(
   }
 
   constexpr float ep = 0.001;
-  shape_output.type = autoware_auto_perception_msgs::msg::Shape::POLYGON;
+  shape_output.type = autoware_perception_msgs::msg::Shape::POLYGON;
   shape_output.dimensions.x = 0.0;
   shape_output.dimensions.y = 0.0;
   shape_output.dimensions.z = std::max((max_z - min_z), ep);
@@ -94,3 +99,6 @@ bool ConvexHullShapeModel::estimate(
   pose_output.orientation.w = 1;
   return true;
 }
+
+}  // namespace model
+}  // namespace autoware::shape_estimation

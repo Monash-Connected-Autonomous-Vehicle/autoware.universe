@@ -42,8 +42,9 @@ VoxelGridBasedEuclideanClusterNode::VoxelGridBasedEuclideanClusterNode(
   cluster_pub_ = this->create_publisher<tier4_perception_msgs::msg::DetectedObjectsWithFeature>(
     "output", rclcpp::QoS{1});
   debug_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("debug/clusters", 1);
-  stop_watch_ptr_ = std::make_unique<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>>();
-  debug_publisher_ = std::make_unique<tier4_autoware_utils::DebugPublisher>(
+  stop_watch_ptr_ =
+    std::make_unique<autoware::universe_utils::StopWatch<std::chrono::milliseconds>>();
+  debug_publisher_ = std::make_unique<autoware::universe_utils::DebugPublisher>(
     this, "voxel_grid_based_euclidean_cluster");
   stop_watch_ptr_->tic("cyclic_time");
   stop_watch_ptr_->tic("processing_time");
@@ -55,31 +56,19 @@ void VoxelGridBasedEuclideanClusterNode::onPointCloud(
   stop_watch_ptr_->toc("processing_time", true);
 
   // convert ros to pcl
-  pcl::PointCloud<pcl::PointXYZ>::Ptr raw_pointcloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
   if (input_msg->data.empty()) {
     // NOTE: prevent pcl log spam
     RCLCPP_WARN_STREAM_THROTTLE(
       this->get_logger(), *this->get_clock(), 1000, "Empty sensor points!");
-  } else {
-    pcl::fromROSMsg(*input_msg, *raw_pointcloud_ptr);
   }
-
-  // clustering
-  std::vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
-  if (!raw_pointcloud_ptr->empty()) {
-    cluster_->cluster(raw_pointcloud_ptr, clusters);
-  }
-
-  // build output msg
+  // cluster and build output msg
   tier4_perception_msgs::msg::DetectedObjectsWithFeature output;
-  convertPointCloudClusters2Msg(input_msg->header, clusters, output);
+
+  cluster_->cluster(input_msg, output);
   cluster_pub_->publish(output);
 
   // build debug msg
-  if (debug_pub_->get_subscription_count() < 1) {
-    return;
-  }
-  {
+  if (debug_pub_->get_subscription_count() >= 1) {
     sensor_msgs::msg::PointCloud2 debug;
     convertObjectMsg2SensorMsg(output, debug);
     debug_pub_->publish(debug);
@@ -87,10 +76,16 @@ void VoxelGridBasedEuclideanClusterNode::onPointCloud(
   if (debug_publisher_) {
     const double processing_time_ms = stop_watch_ptr_->toc("processing_time", true);
     const double cyclic_time_ms = stop_watch_ptr_->toc("cyclic_time", true);
+    const double pipeline_latency_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::nanoseconds((this->get_clock()->now() - output.header.stamp).nanoseconds()))
+        .count();
     debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/cyclic_time_ms", cyclic_time_ms);
     debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/processing_time_ms", processing_time_ms);
+    debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+      "debug/pipeline_latency_ms", pipeline_latency_ms);
   }
 }
 

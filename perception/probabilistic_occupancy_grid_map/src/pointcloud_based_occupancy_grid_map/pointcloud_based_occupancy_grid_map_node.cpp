@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pointcloud_based_occupancy_grid_map/pointcloud_based_occupancy_grid_map_node.hpp"
+#include "pointcloud_based_occupancy_grid_map_node.hpp"
 
-#include "cost_value.hpp"
-#include "pointcloud_based_occupancy_grid_map/occupancy_grid_map_fixed.hpp"
-#include "pointcloud_based_occupancy_grid_map/occupancy_grid_map_projective.hpp"
-#include "utils/utils.hpp"
+#include "autoware/probabilistic_occupancy_grid_map/cost_value/cost_value.hpp"
+#include "autoware/probabilistic_occupancy_grid_map/costmap_2d/occupancy_grid_map_fixed.hpp"
+#include "autoware/probabilistic_occupancy_grid_map/costmap_2d/occupancy_grid_map_projective.hpp"
+#include "autoware/probabilistic_occupancy_grid_map/utils/utils.hpp"
 
+#include <autoware/universe_utils/ros/debug_publisher.hpp>
+#include <autoware/universe_utils/system/stop_watch.hpp>
 #include <pcl_ros/transforms.hpp>
-#include <tier4_autoware_utils/ros/debug_publisher.hpp>
-#include <tier4_autoware_utils/system/stop_watch.hpp>
 
 #include <nav_msgs/msg/occupancy_grid.hpp>
 
@@ -40,7 +40,7 @@
 #include <memory>
 #include <string>
 
-namespace occupancy_grid_map
+namespace autoware::occupancy_grid_map
 {
 using costmap_2d::OccupancyGridMapBBFUpdater;
 using costmap_2d::OccupancyGridMapFixedBlindSpot;
@@ -58,7 +58,7 @@ PointcloudBasedOccupancyGridMapNode::PointcloudBasedOccupancyGridMapNode(
   map_frame_ = this->declare_parameter<std::string>("map_frame");
   base_link_frame_ = this->declare_parameter<std::string>("base_link_frame");
   gridmap_origin_frame_ = this->declare_parameter<std::string>("gridmap_origin_frame");
-  scan_origin_frame_ = this->declare_parameter<std::string>("scan_origin_frame");
+  scan_origin_frame_ = this->declare_parameter<std::string>("scan_origin_frame", "");
   use_height_filter_ = this->declare_parameter<bool>("height_filter.use_height_filter");
   min_height_ = this->declare_parameter<double>("height_filter.min_height");
   max_height_ = this->declare_parameter<double>("height_filter.max_height");
@@ -119,8 +119,8 @@ PointcloudBasedOccupancyGridMapNode::PointcloudBasedOccupancyGridMapNode(
 
   // initialize debug tool
   {
-    using tier4_autoware_utils::DebugPublisher;
-    using tier4_autoware_utils::StopWatch;
+    using autoware::universe_utils::DebugPublisher;
+    using autoware::universe_utils::StopWatch;
     stop_watch_ptr_ = std::make_unique<StopWatch<std::chrono::milliseconds>>();
     debug_publisher_ptr_ =
       std::make_unique<DebugPublisher>(this, "pointcloud_based_occupancy_grid_map");
@@ -136,6 +136,11 @@ void PointcloudBasedOccupancyGridMapNode::onPointcloudWithObstacleAndRaw(
   if (stop_watch_ptr_) {
     stop_watch_ptr_->toc("processing_time", true);
   }
+  // if scan_origin_frame_ is "", replace it with input_raw_msg->header.frame_id
+  if (scan_origin_frame_.empty()) {
+    scan_origin_frame_ = input_raw_msg->header.frame_id;
+  }
+
   // Apply height filter
   PointCloud2 cropped_obstacle_pc{};
   PointCloud2 cropped_raw_pc{};
@@ -170,7 +175,7 @@ void PointcloudBasedOccupancyGridMapNode::onPointcloudWithObstacleAndRaw(
   Pose gridmap_origin{};
   Pose scan_origin{};
   try {
-    robot_pose = utils::getPose(input_raw_msg->header, *tf2_, map_frame_);
+    robot_pose = utils::getPose(input_raw_msg->header.stamp, *tf2_, base_link_frame_, map_frame_);
     gridmap_origin =
       utils::getPose(input_raw_msg->header.stamp, *tf2_, gridmap_origin_frame_, map_frame_);
     scan_origin =
@@ -206,10 +211,17 @@ void PointcloudBasedOccupancyGridMapNode::onPointcloudWithObstacleAndRaw(
   if (debug_publisher_ptr_ && stop_watch_ptr_) {
     const double cyclic_time_ms = stop_watch_ptr_->toc("cyclic_time", true);
     const double processing_time_ms = stop_watch_ptr_->toc("processing_time", true);
+    const double pipeline_latency_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::nanoseconds(
+          (this->get_clock()->now() - input_raw_msg->header.stamp).nanoseconds()))
+        .count();
     debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/cyclic_time_ms", cyclic_time_ms);
     debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/processing_time_ms", processing_time_ms);
+    debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+      "debug/pipeline_latency_ms", pipeline_latency_ms);
   }
 }
 
@@ -238,12 +250,12 @@ OccupancyGrid::UniquePtr PointcloudBasedOccupancyGridMapNode::OccupancyGridMapTo
 
   unsigned char * data = occupancy_grid_map.getCharMap();
   for (unsigned int i = 0; i < msg_ptr->data.size(); ++i) {
-    msg_ptr->data[i] = occupancy_cost_value::cost_translation_table[data[i]];
+    msg_ptr->data[i] = cost_value::cost_translation_table[data[i]];
   }
   return msg_ptr;
 }
 
-}  // namespace occupancy_grid_map
+}  // namespace autoware::occupancy_grid_map
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(occupancy_grid_map::PointcloudBasedOccupancyGridMapNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode)

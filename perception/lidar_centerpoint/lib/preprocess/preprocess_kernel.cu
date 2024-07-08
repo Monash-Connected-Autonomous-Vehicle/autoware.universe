@@ -28,9 +28,11 @@
  * limitations under the License.
  */
 
+#include "lidar_centerpoint/cuda_utils.hpp"
 #include "lidar_centerpoint/preprocess/preprocess_kernel.hpp"
+#include "lidar_centerpoint/utils.hpp"
 
-#include <lidar_centerpoint/utils.hpp>
+#include <cassert>
 
 namespace
 {
@@ -41,6 +43,51 @@ const std::size_t ENCODER_IN_FEATURE_SIZE = 9;  // the same as encoder_in_featur
 
 namespace centerpoint
 {
+
+__global__ void generateSweepPoints_kernel(
+  const float * input_points, size_t points_size, int input_point_step, float time_lag,
+  const float * transform_array, int num_features, float * output_points)
+{
+  int point_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (point_idx >= points_size) return;
+
+  const float input_x = input_points[point_idx * input_point_step + 0];
+  const float input_y = input_points[point_idx * input_point_step + 1];
+  const float input_z = input_points[point_idx * input_point_step + 2];
+
+  // transform_array is expected to be column-major
+  output_points[point_idx * num_features + 0] = transform_array[0] * input_x +
+                                                transform_array[4] * input_y +
+                                                transform_array[8] * input_z + transform_array[12];
+  output_points[point_idx * num_features + 1] = transform_array[1] * input_x +
+                                                transform_array[5] * input_y +
+                                                transform_array[9] * input_z + transform_array[13];
+  output_points[point_idx * num_features + 2] = transform_array[2] * input_x +
+                                                transform_array[6] * input_y +
+                                                transform_array[10] * input_z + transform_array[14];
+  output_points[point_idx * num_features + 3] = time_lag;
+}
+
+cudaError_t generateSweepPoints_launch(
+  const float * input_points, size_t points_size, int input_point_step, float time_lag,
+  const float * transform_array, int num_features, float * output_points, cudaStream_t stream)
+{
+  auto transform_d = cuda::make_unique<float[]>(16);
+  CHECK_CUDA_ERROR(cudaMemcpyAsync(
+    transform_d.get(), transform_array, 16 * sizeof(float), cudaMemcpyHostToDevice, stream));
+
+  dim3 blocks((points_size + 256 - 1) / 256);
+  dim3 threads(256);
+  assert(num_features == 4);
+
+  generateSweepPoints_kernel<<<blocks, threads, 0, stream>>>(
+    input_points, points_size, input_point_step, time_lag, transform_d.get(), num_features,
+    output_points);
+
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
 __global__ void generateVoxels_random_kernel(
   const float * points, size_t points_size, float min_x_range, float max_x_range, float min_y_range,
   float max_y_range, float min_z_range, float max_z_range, float pillar_x_size, float pillar_y_size,
@@ -78,6 +125,11 @@ cudaError_t generateVoxels_random_launch(
 {
   dim3 blocks((points_size + 256 - 1) / 256);
   dim3 threads(256);
+
+  if (blocks.x == 0) {
+    return cudaGetLastError();
+  }
+
   generateVoxels_random_kernel<<<blocks, threads, 0, stream>>>(
     points, points_size, min_x_range, max_x_range, min_y_range, max_y_range, min_z_range,
     max_z_range, pillar_x_size, pillar_y_size, pillar_z_size, grid_y_size, grid_x_size, mask,
@@ -87,8 +139,8 @@ cudaError_t generateVoxels_random_launch(
 }
 
 __global__ void generateBaseFeatures_kernel(
-  unsigned int * mask, float * voxels, int grid_y_size, int grid_x_size, unsigned int * pillar_num,
-  float * voxel_features, float * voxel_num, int * voxel_idxs)
+  unsigned int * mask, float * voxels, int grid_y_size, int grid_x_size, int max_voxel_size,
+  unsigned int * pillar_num, float * voxel_features, float * voxel_num, int * voxel_idxs)
 {
   unsigned int voxel_idx = blockIdx.x * blockDim.x + threadIdx.x;
   unsigned int voxel_idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -102,6 +154,7 @@ __global__ void generateBaseFeatures_kernel(
 
   unsigned int current_pillarId = 0;
   current_pillarId = atomicAdd(pillar_num, 1);
+  if (current_pillarId > max_voxel_size - 1) return;
 
   voxel_num[current_pillarId] = count;
 
@@ -120,15 +173,17 @@ __global__ void generateBaseFeatures_kernel(
 
 // create 4 channels
 cudaError_t generateBaseFeatures_launch(
-  unsigned int * mask, float * voxels, int grid_y_size, int grid_x_size, unsigned int * pillar_num,
-  float * voxel_features, float * voxel_num, int * voxel_idxs, cudaStream_t stream)
+  unsigned int * mask, float * voxels, int grid_y_size, int grid_x_size, int max_voxel_size,
+  unsigned int * pillar_num, float * voxel_features, float * voxel_num, int * voxel_idxs,
+  cudaStream_t stream)
 {
   dim3 threads = {32, 32};
   dim3 blocks = {
     (grid_x_size + threads.x - 1) / threads.x, (grid_y_size + threads.y - 1) / threads.y};
 
   generateBaseFeatures_kernel<<<blocks, threads, 0, stream>>>(
-    mask, voxels, grid_y_size, grid_x_size, pillar_num, voxel_features, voxel_num, voxel_idxs);
+    mask, voxels, grid_y_size, grid_x_size, max_voxel_size, pillar_num, voxel_features, voxel_num,
+    voxel_idxs);
   cudaError_t err = cudaGetLastError();
   return err;
 }

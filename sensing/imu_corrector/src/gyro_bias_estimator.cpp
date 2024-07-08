@@ -14,7 +14,7 @@
 
 #include "gyro_bias_estimator.hpp"
 
-#include "tier4_autoware_utils/geometry/geometry.hpp"
+#include "autoware/universe_utils/geometry/geometry.hpp"
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -23,13 +23,14 @@
 
 namespace imu_corrector
 {
-GyroBiasEstimator::GyroBiasEstimator()
-: Node("gyro_bias_validator"),
+GyroBiasEstimator::GyroBiasEstimator(const rclcpp::NodeOptions & options)
+: rclcpp::Node("gyro_bias_validator", options),
   gyro_bias_threshold_(declare_parameter<double>("gyro_bias_threshold")),
   angular_velocity_offset_x_(declare_parameter<double>("angular_velocity_offset_x")),
   angular_velocity_offset_y_(declare_parameter<double>("angular_velocity_offset_y")),
   angular_velocity_offset_z_(declare_parameter<double>("angular_velocity_offset_z")),
   timer_callback_interval_sec_(declare_parameter<double>("timer_callback_interval_sec")),
+  diagnostics_updater_interval_sec_(declare_parameter<double>("diagnostics_updater_interval_sec")),
   straight_motion_ang_vel_upper_limit_(
     declare_parameter<double>("straight_motion_ang_vel_upper_limit")),
   updater_(this),
@@ -37,6 +38,8 @@ GyroBiasEstimator::GyroBiasEstimator()
 {
   updater_.setHardwareID(get_name());
   updater_.add("gyro_bias_validator", this, &GyroBiasEstimator::update_diagnostics);
+  // diagnostic_updater is designed to be updated at the same rate as the timer
+  updater_.setPeriod(diagnostics_updater_interval_sec_);
 
   gyro_bias_estimation_module_ = std::make_unique<GyroBiasEstimationModule>();
 
@@ -48,15 +51,27 @@ GyroBiasEstimator::GyroBiasEstimator()
     [this](const Odometry::ConstSharedPtr msg) { callback_odom(msg); });
   gyro_bias_pub_ = create_publisher<Vector3Stamped>("~/output/gyro_bias", rclcpp::SensorDataQoS());
 
-  auto timer_callback = std::bind(&GyroBiasEstimator::timer_callback, this);
+  auto bound_timer_callback = std::bind(&GyroBiasEstimator::timer_callback, this);
   auto period_control = std::chrono::duration_cast<std::chrono::nanoseconds>(
     std::chrono::duration<double>(timer_callback_interval_sec_));
-  timer_ = std::make_shared<rclcpp::GenericTimer<decltype(timer_callback)>>(
-    this->get_clock(), period_control, std::move(timer_callback),
+  timer_ = std::make_shared<rclcpp::GenericTimer<decltype(bound_timer_callback)>>(
+    this->get_clock(), period_control, std::move(bound_timer_callback),
     this->get_node_base_interface()->get_context());
   this->get_node_timers_interface()->add_timer(timer_, nullptr);
 
-  transform_listener_ = std::make_shared<tier4_autoware_utils::TransformListener>(this);
+  transform_listener_ = std::make_shared<autoware::universe_utils::TransformListener>(this);
+
+  // initialize diagnostics_info_
+  {
+    diagnostics_info_.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    diagnostics_info_.summary_message = "Not initialized";
+    diagnostics_info_.gyro_bias_x_for_imu_corrector = std::nan("");
+    diagnostics_info_.gyro_bias_y_for_imu_corrector = std::nan("");
+    diagnostics_info_.gyro_bias_z_for_imu_corrector = std::nan("");
+    diagnostics_info_.estimated_gyro_bias_x = std::nan("");
+    diagnostics_info_.estimated_gyro_bias_y = std::nan("");
+    diagnostics_info_.estimated_gyro_bias_z = std::nan("");
+  }
 }
 
 void GyroBiasEstimator::callback_imu(const Imu::ConstSharedPtr imu_msg_ptr)
@@ -99,6 +114,7 @@ void GyroBiasEstimator::callback_odom(const Odometry::ConstSharedPtr odom_msg_pt
 void GyroBiasEstimator::timer_callback()
 {
   if (pose_buf_.empty()) {
+    diagnostics_info_.summary_message = "Skipped update (pose_buf is empty)";
     return;
   }
 
@@ -112,6 +128,7 @@ void GyroBiasEstimator::timer_callback()
   const rclcpp::Time t0_rclcpp_time = rclcpp::Time(pose_buf.front().header.stamp);
   const rclcpp::Time t1_rclcpp_time = rclcpp::Time(pose_buf.back().header.stamp);
   if (t1_rclcpp_time <= t0_rclcpp_time) {
+    diagnostics_info_.summary_message = "Skipped update (pose_buf is not in chronological order)";
     return;
   }
 
@@ -127,19 +144,22 @@ void GyroBiasEstimator::timer_callback()
   // Check gyro data size
   // Data size must be greater than or equal to 2 since the time difference will be taken later
   if (gyro_filtered.size() <= 1) {
+    diagnostics_info_.summary_message = "Skipped update (gyro_filtered size is less than 2)";
     return;
   }
 
   // Check if the vehicle is moving straight
   const geometry_msgs::msg::Vector3 rpy_0 =
-    tier4_autoware_utils::getRPY(pose_buf.front().pose.orientation);
+    autoware::universe_utils::getRPY(pose_buf.front().pose.orientation);
   const geometry_msgs::msg::Vector3 rpy_1 =
-    tier4_autoware_utils::getRPY(pose_buf.back().pose.orientation);
-  const double yaw_diff = std::abs(tier4_autoware_utils::normalizeRadian(rpy_1.z - rpy_0.z));
+    autoware::universe_utils::getRPY(pose_buf.back().pose.orientation);
+  const double yaw_diff = std::abs(autoware::universe_utils::normalizeRadian(rpy_1.z - rpy_0.z));
   const double time_diff = (t1_rclcpp_time - t0_rclcpp_time).seconds();
   const double yaw_vel = yaw_diff / time_diff;
   const bool is_straight = (yaw_vel < straight_motion_ang_vel_upper_limit_);
   if (!is_straight) {
+    diagnostics_info_.summary_message =
+      "Skipped update (yaw angular velocity is greater than straight_motion_ang_vel_upper_limit)";
     return;
   }
 
@@ -151,12 +171,45 @@ void GyroBiasEstimator::timer_callback()
   if (!tf_base2imu_ptr) {
     RCLCPP_ERROR(
       this->get_logger(), "Please publish TF %s to %s", imu_frame_.c_str(), output_frame_.c_str());
+
+    diagnostics_info_.summary_message = "Skipped update (tf between base and imu is not available)";
     return;
   }
+
   gyro_bias_ =
     transform_vector3(gyro_bias_estimation_module_->get_bias_base_link(), *tf_base2imu_ptr);
 
+  validate_gyro_bias();
   updater_.force_update();
+  updater_.setPeriod(diagnostics_updater_interval_sec_);  // to reset timer inside the updater
+}
+
+void GyroBiasEstimator::validate_gyro_bias()
+{
+  // Calculate diagnostics key-values
+  diagnostics_info_.gyro_bias_x_for_imu_corrector = gyro_bias_.value().x;
+  diagnostics_info_.gyro_bias_y_for_imu_corrector = gyro_bias_.value().y;
+  diagnostics_info_.gyro_bias_z_for_imu_corrector = gyro_bias_.value().z;
+  diagnostics_info_.estimated_gyro_bias_x = gyro_bias_.value().x - angular_velocity_offset_x_;
+  diagnostics_info_.estimated_gyro_bias_y = gyro_bias_.value().y - angular_velocity_offset_y_;
+  diagnostics_info_.estimated_gyro_bias_z = gyro_bias_.value().z - angular_velocity_offset_z_;
+
+  // Validation
+  const bool is_bias_small_enough =
+    std::abs(diagnostics_info_.estimated_gyro_bias_x) < gyro_bias_threshold_ &&
+    std::abs(diagnostics_info_.estimated_gyro_bias_y) < gyro_bias_threshold_ &&
+    std::abs(diagnostics_info_.estimated_gyro_bias_z) < gyro_bias_threshold_;
+
+  // Update diagnostics
+  if (is_bias_small_enough) {
+    diagnostics_info_.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    diagnostics_info_.summary_message = "Successfully updated";
+  } else {
+    diagnostics_info_.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    diagnostics_info_.summary_message =
+      "Gyro bias may be incorrect. Please calibrate IMU and reflect the result in imu_corrector. "
+      "You may also use the output of gyro_bias_estimator.";
+  }
 }
 
 geometry_msgs::msg::Vector3 GyroBiasEstimator::transform_vector3(
@@ -172,36 +225,25 @@ geometry_msgs::msg::Vector3 GyroBiasEstimator::transform_vector3(
 
 void GyroBiasEstimator::update_diagnostics(diagnostic_updater::DiagnosticStatusWrapper & stat)
 {
-  if (gyro_bias_ == std::nullopt) {
-    stat.add("gyro_bias", "Bias estimation is not yet ready because of insufficient data.");
-    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Not initialized");
-  } else {
-    stat.add("gyro_bias_x_for_imu_corrector", gyro_bias_.value().x);
-    stat.add("gyro_bias_y_for_imu_corrector", gyro_bias_.value().y);
-    stat.add("gyro_bias_z_for_imu_corrector", gyro_bias_.value().z);
+  auto f = [](const double & value) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(8) << value;
+    return ss.str();
+  };
 
-    stat.add("estimated_gyro_bias_x", gyro_bias_.value().x - angular_velocity_offset_x_);
-    stat.add("estimated_gyro_bias_y", gyro_bias_.value().y - angular_velocity_offset_y_);
-    stat.add("estimated_gyro_bias_z", gyro_bias_.value().z - angular_velocity_offset_z_);
+  stat.summary(diagnostics_info_.level, diagnostics_info_.summary_message);
+  stat.add("gyro_bias_x_for_imu_corrector", f(diagnostics_info_.gyro_bias_x_for_imu_corrector));
+  stat.add("gyro_bias_y_for_imu_corrector", f(diagnostics_info_.gyro_bias_y_for_imu_corrector));
+  stat.add("gyro_bias_z_for_imu_corrector", f(diagnostics_info_.gyro_bias_z_for_imu_corrector));
 
-    // Validation
-    const bool is_bias_small_enough =
-      std::abs(gyro_bias_.value().x - angular_velocity_offset_x_) < gyro_bias_threshold_ &&
-      std::abs(gyro_bias_.value().y - angular_velocity_offset_y_) < gyro_bias_threshold_ &&
-      std::abs(gyro_bias_.value().z - angular_velocity_offset_z_) < gyro_bias_threshold_;
+  stat.add("estimated_gyro_bias_x", f(diagnostics_info_.estimated_gyro_bias_x));
+  stat.add("estimated_gyro_bias_y", f(diagnostics_info_.estimated_gyro_bias_y));
+  stat.add("estimated_gyro_bias_z", f(diagnostics_info_.estimated_gyro_bias_z));
 
-    // Update diagnostics
-    if (is_bias_small_enough) {
-      stat.add("gyro_bias", "OK");
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "OK");
-    } else {
-      stat.add(
-        "gyro_bias",
-        "Gyro bias may be incorrect. Please calibrate IMU and reflect the result in "
-        "imu_corrector. You may also use the output of gyro_bias_estimator.");
-      stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "WARN");
-    }
-  }
+  stat.add("gyro_bias_threshold", f(gyro_bias_threshold_));
 }
 
 }  // namespace imu_corrector
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(imu_corrector::GyroBiasEstimator)

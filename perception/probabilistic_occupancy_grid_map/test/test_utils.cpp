@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// autoware
+#include "autoware/probabilistic_occupancy_grid_map/utils/utils.hpp"
+
 #include <gtest/gtest.h>
 
 #include <memory>
@@ -20,9 +23,6 @@
 
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
-
-// autoware
-#include "utils/utils.hpp"
 
 // create pointcloud function
 pcl::PointCloud<pcl::PointXYZ> createPCLPointCloudWithIteratedHeight(const size_t width)
@@ -77,14 +77,14 @@ TEST(TestUtils, TestCropPointcloudByHeight)
   sensor_msgs::msg::PointCloud2 test1_output, test2_output, test3_output;
 
   // case1: normal input, normal output
-  EXPECT_NO_THROW(
-    utils::cropPointcloudByHeight(ros_cloud_10, mock_buffer, "base_link", 0.0, 10.0, test1_output));
+  EXPECT_NO_THROW(autoware::occupancy_grid_map::utils::cropPointcloudByHeight(
+    ros_cloud_10, mock_buffer, "base_link", 0.0, 10.0, test1_output));
 
   // case2: normal input, empty output
-  EXPECT_NO_THROW(utils::cropPointcloudByHeight(
+  EXPECT_NO_THROW(autoware::occupancy_grid_map::utils::cropPointcloudByHeight(
     ros_cloud_10, mock_buffer, "base_link", -2.0, -0.1, test2_output));
 
   // case3: empty input, normal output
-  EXPECT_NO_THROW(
-    utils::cropPointcloudByHeight(ros_cloud_0, mock_buffer, "base_link", 0.0, 10.0, test3_output));
+  EXPECT_NO_THROW(autoware::occupancy_grid_map::utils::cropPointcloudByHeight(
+    ros_cloud_0, mock_buffer, "base_link", 0.0, 10.0, test3_output));
 }

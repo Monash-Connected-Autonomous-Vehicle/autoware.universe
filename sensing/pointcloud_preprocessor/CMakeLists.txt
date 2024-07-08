@@ -9,6 +9,7 @@ set(CGAL_DATA_DIR ".")
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Sophus REQUIRED)
 find_package(Boost REQUIRED)
 find_package(PCL REQUIRED)
 find_package(CGAL REQUIRED COMPONENTS Core)
@@ -19,6 +20,7 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
+  ${Sophus_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
 
@@ -37,7 +39,7 @@ ament_target_dependencies(pointcloud_preprocessor_filter_base
   rclcpp
   sensor_msgs
   tf2_ros
-  tier4_autoware_utils
+  autoware_universe_utils
   pcl_ros
 )
 
@@ -65,6 +67,7 @@ ament_auto_add_library(pointcloud_preprocessor_filter SHARED
   src/downsample_filter/voxel_grid_downsample_filter_nodelet.cpp
   src/downsample_filter/random_downsample_filter_nodelet.cpp
   src/downsample_filter/approximate_downsample_filter_nodelet.cpp
+  src/downsample_filter/pickup_based_voxel_grid_downsample_filter.cpp
   src/outlier_filter/ring_outlier_filter_nodelet.cpp
   src/outlier_filter/voxel_grid_outlier_filter_nodelet.cpp
   src/outlier_filter/radius_search_2d_outlier_filter_nodelet.cpp
@@ -75,6 +78,7 @@ ament_auto_add_library(pointcloud_preprocessor_filter SHARED
   src/pointcloud_accumulator/pointcloud_accumulator_nodelet.cpp
   src/vector_map_filter/lanelet2_map_filter_nodelet.cpp
   src/distortion_corrector/distortion_corrector.cpp
+  src/distortion_corrector/distortion_corrector_node.cpp
   src/blockage_diag/blockage_diag_nodelet.cpp
   src/polygon_remover/polygon_remover.cpp
   src/vector_map_filter/vector_map_inside_area_filter.cpp
@@ -85,6 +89,7 @@ target_link_libraries(pointcloud_preprocessor_filter
   faster_voxel_grid_downsample_filter
   ${Boost_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${Sophus_LIBRARIES}
   ${PCL_LIBRARIES}
 )
 
@@ -113,6 +118,11 @@ rclcpp_components_register_node(pointcloud_preprocessor_filter
 rclcpp_components_register_node(pointcloud_preprocessor_filter
   PLUGIN "pointcloud_preprocessor::VoxelGridDownsampleFilterComponent"
   EXECUTABLE voxel_grid_downsample_filter_node)
+
+# -- Pickup Based Voxel Grid Downsample Filter --
+rclcpp_components_register_node(pointcloud_preprocessor_filter
+  PLUGIN "pointcloud_preprocessor::PickupBasedVoxelGridDownsampleFilterComponent"
+  EXECUTABLE pickup_based_voxel_grid_downsample_filter_node)
 
 # -- Random Downsample Filter --
 rclcpp_components_register_node(pointcloud_preprocessor_filter
@@ -211,16 +221,18 @@ ament_export_targets(export_${PROJECT_NAME})
 
 ament_auto_package(INSTALL_TO_SHARE
   launch
+  config
 )
 
-
 if(BUILD_TESTING)
-  add_ros_test(
-    test/test_distortion_corrector.py
-    TIMEOUT "30"
+  find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_gtest)
+  ament_lint_auto_find_test_dependencies()
+  ament_add_gtest(test_utilities
+    test/test_utilities.cpp
   )
-  add_ros_test(
-    test/test_distortion_corrector_use_imu_false.py
-    TIMEOUT "30"
-  )
+
+  target_link_libraries(test_utilities pointcloud_preprocessor_filter)
+
+
 endif()

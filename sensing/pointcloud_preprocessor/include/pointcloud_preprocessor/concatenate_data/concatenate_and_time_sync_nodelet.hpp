@@ -63,10 +63,10 @@
 // ROS includes
 #include "autoware_point_types/types.hpp"
 
+#include <autoware/universe_utils/ros/debug_publisher.hpp>
+#include <autoware/universe_utils/system/stop_watch.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <point_cloud_msg_wrapper/point_cloud_msg_wrapper.hpp>
-#include <tier4_autoware_utils/ros/debug_publisher.hpp>
-#include <tier4_autoware_utils/system/stop_watch.hpp>
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
@@ -126,6 +126,8 @@ private:
   double timeout_sec_ = 0.1;
 
   bool publish_synchronized_pointcloud_;
+  bool keep_input_frame_in_synchronized_pointcloud_;
+  std::string synchronized_pointcloud_postfix_;
 
   std::set<std::string> not_subscribed_topic_names_;
 
@@ -179,10 +181,12 @@ private:
   void timer_callback();
 
   void checkConcatStatus(diagnostic_updater::DiagnosticStatusWrapper & stat);
+  std::string replaceSyncTopicNamePostfix(
+    const std::string & original_topic_name, const std::string & postfix);
 
   /** \brief processing time publisher. **/
-  std::unique_ptr<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_;
-  std::unique_ptr<tier4_autoware_utils::DebugPublisher> debug_publisher_;
+  std::unique_ptr<autoware::universe_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_;
+  std::unique_ptr<autoware::universe_utils::DebugPublisher> debug_publisher_;
 };
 
 }  // namespace pointcloud_preprocessor

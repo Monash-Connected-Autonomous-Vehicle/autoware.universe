@@ -17,15 +17,18 @@
 
 #include "image_projection_based_fusion/fusion_node.hpp"
 
+#include <image_projection_based_fusion/utils/utils.hpp>
+
 #include <string>
 #include <vector>
 namespace image_projection_based_fusion
 {
 class RoiPointCloudFusionNode
-: public FusionNode<sensor_msgs::msg::PointCloud2, DetectedObjectWithFeature>
+: public FusionNode<PointCloud2, DetectedObjectWithFeature, DetectedObjectsWithFeature>
 {
 private:
   int min_cluster_size_{1};
+  int max_cluster_size_{20};
   bool fuse_unknown_only_{true};
   double cluster_2d_tolerance_;
 

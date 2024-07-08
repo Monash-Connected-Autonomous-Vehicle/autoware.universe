@@ -37,8 +37,8 @@ PointCloudConcatenationComponent::PointCloudConcatenationComponent(
 {
   // initialize debug tool
   {
-    using tier4_autoware_utils::DebugPublisher;
-    using tier4_autoware_utils::StopWatch;
+    using autoware::universe_utils::DebugPublisher;
+    using autoware::universe_utils::StopWatch;
     stop_watch_ptr_ = std::make_unique<StopWatch<std::chrono::milliseconds>>();
     debug_publisher_ = std::make_unique<DebugPublisher>(this, "concatenate_pointclouds_debug");
     stop_watch_ptr_->tic("cyclic_time");
@@ -74,12 +74,6 @@ PointCloudConcatenationComponent::PointCloudConcatenationComponent(
       return;
     }
   }
-  // add postfix to topic names
-  {
-    for (auto & topic : input_topics_) {
-      topic = topic + POSTFIX_NAME;
-    }
-  }
 
   // Initialize not_subscribed_topic_names_
   {
@@ -103,15 +97,17 @@ PointCloudConcatenationComponent::PointCloudConcatenationComponent(
 
   // Output Publishers
   {
+    rclcpp::PublisherOptions pub_options;
+    pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
     pub_output_ = this->create_publisher<PointCloud2>(
-      "output", rclcpp::SensorDataQoS().keep_last(maximum_queue_size_));
+      "output", rclcpp::SensorDataQoS().keep_last(maximum_queue_size_), pub_options);
   }
 
   // Subscribers
   {
     RCLCPP_INFO_STREAM(
       get_logger(), "Subscribing to " << input_topics_.size() << " user given topics as inputs:");
-    for (auto & input_topic : input_topics_) {
+    for (const auto & input_topic : input_topics_) {
       RCLCPP_INFO_STREAM(get_logger(), " - " << input_topic);
     }
 
@@ -286,6 +282,20 @@ void PointCloudConcatenationComponent::publish()
 
   checkSyncStatus();
   combineClouds(concat_cloud_ptr);
+
+  for (const auto & e : cloud_stdmap_) {
+    if (e.second != nullptr) {
+      if (debug_publisher_) {
+        const auto pipeline_latency_ms =
+          std::chrono::duration<double, std::milli>(
+            std::chrono::nanoseconds(
+              (this->get_clock()->now() - e.second->header.stamp).nanoseconds()))
+            .count();
+        debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+          "debug" + e.first + "/pipeline_latency_ms", pipeline_latency_ms);
+      }
+    }
+  }
 
   // publish concatenated pointcloud
   if (concat_cloud_ptr) {

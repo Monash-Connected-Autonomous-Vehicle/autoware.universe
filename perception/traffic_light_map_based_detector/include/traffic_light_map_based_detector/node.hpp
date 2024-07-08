@@ -15,17 +15,22 @@
 #ifndef TRAFFIC_LIGHT_MAP_BASED_DETECTOR__NODE_HPP_
 #define TRAFFIC_LIGHT_MAP_BASED_DETECTOR__NODE_HPP_
 
-#include <lanelet2_extension/regulatory_elements/autoware_traffic_light.hpp>
+#include <autoware_lanelet2_extension/regulatory_elements/autoware_traffic_light.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <autoware_auto_mapping_msgs/msg/had_map_bin.hpp>
+#include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
 #include <autoware_planning_msgs/msg/lanelet_route.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <tier4_perception_msgs/msg/traffic_light_roi_array.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
-#include <image_geometry/pinhole_camera_model.h>
+#if __has_include(<image_geometry/pinhole_camera_model.hpp>)
+#include <image_geometry/pinhole_camera_model.hpp>  // for ROS 2 Jazzy or newer
+#else
+#include <image_geometry/pinhole_camera_model.h>  // for ROS 2 Humble or older
+#endif
+
 #include <lanelet2_core/LaneletMap.h>
 #include <lanelet2_routing/RoutingGraph.h>
 #include <lanelet2_traffic_rules/TrafficRulesFactory.h>
@@ -58,6 +63,8 @@ private:
     double max_timestamp_offset;
     double timestamp_sample_len;
     double max_detection_range;
+    double car_traffic_light_max_angle_range;
+    double pedestrian_traffic_light_max_angle_range;
   };
 
   struct IdLessThan
@@ -70,7 +77,7 @@ private:
   };
 
 private:
-  rclcpp::Subscription<autoware_auto_mapping_msgs::msg::HADMapBin>::SharedPtr map_sub_;
+  rclcpp::Subscription<autoware_map_msgs::msg::LaneletMapBin>::SharedPtr map_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
   rclcpp::Subscription<autoware_planning_msgs::msg::LaneletRoute>::SharedPtr route_sub_;
   /**
@@ -93,9 +100,13 @@ private:
   std::shared_ptr<TrafficLightSet> all_traffic_lights_ptr_;
   std::shared_ptr<TrafficLightSet> route_traffic_lights_ptr_;
 
+  std::set<int64_t> pedestrian_tl_id_;
+
   lanelet::LaneletMapPtr lanelet_map_ptr_;
   lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr_;
   lanelet::routing::RoutingGraphPtr routing_graph_ptr_;
+
+  std::shared_ptr<const lanelet::routing::RoutingGraphContainer> overall_graphs_ptr_;
 
   Config config_;
   /**
@@ -114,7 +125,7 @@ private:
    *
    * @param input_msg
    */
-  void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr input_msg);
+  void mapCallback(const autoware_map_msgs::msg::LaneletMapBin::ConstSharedPtr input_msg);
   /**
    * @brief callback function for the camera info message. The main process function of the node
    *

@@ -14,8 +14,8 @@
 #ifndef GYRO_BIAS_ESTIMATOR_HPP_
 #define GYRO_BIAS_ESTIMATOR_HPP_
 
+#include "autoware/universe_utils/ros/transform_listener.hpp"
 #include "gyro_bias_estimation_module.hpp"
-#include "tier4_autoware_utils/ros/transform_listener.hpp"
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -42,13 +42,14 @@ private:
   using Odometry = nav_msgs::msg::Odometry;
 
 public:
-  GyroBiasEstimator();
+  explicit GyroBiasEstimator(const rclcpp::NodeOptions & options);
 
 private:
   void update_diagnostics(diagnostic_updater::DiagnosticStatusWrapper & stat);
   void callback_imu(const Imu::ConstSharedPtr imu_msg_ptr);
   void callback_odom(const Odometry::ConstSharedPtr odom_msg_ptr);
   void timer_callback();
+  void validate_gyro_bias();
 
   static geometry_msgs::msg::Vector3 transform_vector3(
     const geometry_msgs::msg::Vector3 & vec,
@@ -68,18 +69,33 @@ private:
   const double angular_velocity_offset_y_;
   const double angular_velocity_offset_z_;
   const double timer_callback_interval_sec_;
+  const double diagnostics_updater_interval_sec_;
   const double straight_motion_ang_vel_upper_limit_;
 
   diagnostic_updater::Updater updater_;
 
   std::optional<Vector3> gyro_bias_;
 
-  std::shared_ptr<tier4_autoware_utils::TransformListener> transform_listener_;
+  std::shared_ptr<autoware::universe_utils::TransformListener> transform_listener_;
 
   std::string imu_frame_;
 
   std::vector<geometry_msgs::msg::Vector3Stamped> gyro_all_;
   std::vector<geometry_msgs::msg::PoseStamped> pose_buf_;
+
+  struct DiagnosticsInfo
+  {
+    unsigned char level;
+    std::string summary_message;
+    double gyro_bias_x_for_imu_corrector;
+    double gyro_bias_y_for_imu_corrector;
+    double gyro_bias_z_for_imu_corrector;
+    double estimated_gyro_bias_x;
+    double estimated_gyro_bias_y;
+    double estimated_gyro_bias_z;
+  };
+
+  DiagnosticsInfo diagnostics_info_;
 };
 }  // namespace imu_corrector
 

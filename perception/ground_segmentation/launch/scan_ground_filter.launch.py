@@ -36,7 +36,7 @@ def launch_setup(context, *args, **kwargs):
     nodes = [
         ComposableNode(
             package="ground_segmentation",
-            plugin="ground_segmentation::ScanGroundFilterComponent",
+            plugin="autoware::ground_segmentation::ScanGroundFilterComponent",
             name="scan_ground_filter",
             remappings=[
                 ("input", LaunchConfiguration("input/pointcloud")),
@@ -85,7 +85,7 @@ def generate_launch_description():
         return DeclareLaunchArgument(name, default_value=default_value)
 
     default_vehicle_info_param = os.path.join(
-        get_package_share_directory("vehicle_info_util"), "config/vehicle_info.param.yaml"
+        get_package_share_directory("autoware_vehicle_info_utils"), "config/vehicle_info.param.yaml"
     )
 
     vehicle_info_param = DeclareLaunchArgument(
